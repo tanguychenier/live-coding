@@ -18,7 +18,7 @@ code, no cuts, no second take. The commit lands when the stream ends.
 Each game keeps its own README: what it is, how to play it, and how the
 interesting part works.
 
-## The games
+## Latest
 
 <table>
 <tr>
