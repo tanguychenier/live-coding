@@ -63,9 +63,8 @@ boss lands on the farthest dead end and the key on the second farthest.
 The sprites come from a prototype I wrote in 2019, kept in
 [game_prototype_lua](https://github.com/tanguychenier/game_prototype_lua).
 
-The sound effects are **synthesised** by [`outils/generer-sons.py`](outils/generer-sons.py)
-rather than taken from a library: nothing to license, and each one is tuned to
-the game.
+The sound effects are synthesised rather than taken from a library: nothing to
+license, and each one is tuned to the game.
 
 Stream music: Scott Buckley, [scottbuckley.com.au](https://www.scottbuckley.com.au)
 (CC BY 4.0). Outro: AIRGLOW, "Memory Bank" (CC BY 3.0).
