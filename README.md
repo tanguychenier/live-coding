@@ -24,18 +24,16 @@ interesting part works.
 <tr>
 <td width="45%">
 
-<a href="binding-of-isaac-like"><img src="binding-of-isaac-like/captures/jeu-1.png" width="100%" alt="Binding of Isaac-like"></a>
+<a href="binding-of-isaac-like"><img src="binding-of-isaac-like/captures/jeu-1.png" width="100%" alt="binding-of-isaac-like"></a>
 
 </td>
 <td valign="top">
 
 ### [binding-of-isaac-like](binding-of-isaac-like)
 
-One floor of twelve rooms generated from a seed, a key hidden in a dead end, a
-locked boss door, five kinds of monster and a boss that charges and fires a
-cross.
+A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key hidden in a dead end, a locked boss door, five kinds of monster and a boss that charges and fires a cross.
 
-Lua, LÖVE 2D, 746 lines, 2 h 14 of stream.
+Lua, LÖVE 2D, 747 lines, 2 h 14 of stream.
 
 [Watch it being written](https://youtu.be/-rA3q0Ju6_c)
 
