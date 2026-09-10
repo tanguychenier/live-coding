@@ -1,10 +1,21 @@
+<div align="center">
+
+<img src="banniere.svg" alt="binding-of-isaac-like" width="100%">
+
 # binding-of-isaac-like
+
+[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/-rA3q0Ju6_c)
+[![LÖVE 11.5](https://img.shields.io/badge/L%C3%96VE-11.5-e64998?logo=love&logoColor=white)](https://love2d.org)
+[![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
+[![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
+
+</div>
 
 A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key
 hidden in a dead end, a locked boss door, five kinds of monster and a boss that
 charges and fires a cross.
 
-Written from an empty file during a single live session:
+Written from an empty file during a single live session, 747 lines in 2 h 14:
 **https://youtu.be/-rA3q0Ju6_c**
 
 <div align="center">
