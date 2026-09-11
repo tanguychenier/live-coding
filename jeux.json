@@ -1,5 +1,13 @@
 [
   {
+    "dossier": "street-fighter-like",
+    "resume": "Four fighters, two stages, three rounds. The opponent runs a state machine, and left alone the game plays both sides itself.",
+    "video": "gJOMl3DYnhg",
+    "lignes": 665,
+    "duree": "2 h 09",
+    "capture": "jeu-1.png"
+  },
+  {
     "dossier": "binding-of-isaac-like",
     "resume": "A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key hidden in a dead end, a locked boss door, five kinds of monster and a boss that charges and fires a cross.",
     "video": "-rA3q0Ju6_c",

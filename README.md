@@ -24,22 +24,28 @@ interesting part works.
 <tr>
 <td width="45%">
 
-<a href="binding-of-isaac-like"><img src="binding-of-isaac-like/captures/jeu-1.png" width="100%" alt="binding-of-isaac-like"></a>
+<a href="street-fighter-like"><img src="street-fighter-like/captures/jeu-1.png" width="100%" alt="street-fighter-like"></a>
 
 </td>
 <td valign="top">
 
-### [binding-of-isaac-like](binding-of-isaac-like)
+### [street-fighter-like](street-fighter-like)
 
-A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key hidden in a dead end, a locked boss door, five kinds of monster and a boss that charges and fires a cross.
+Four fighters, two stages, three rounds. The opponent runs a state machine, and left alone the game plays both sides itself.
 
-Lua, LÖVE 2D, 747 lines, 2 h 14 of stream.
+Lua, LÖVE 2D, 665 lines, 2 h 09 of stream.
 
-[Watch it being written](https://youtu.be/-rA3q0Ju6_c)
+[Watch it being written](https://youtu.be/gJOMl3DYnhg)
 
 </td>
 </tr>
 </table>
+
+## Everything else
+
+| game | what it is | lines | stream | |
+|---|---|---:|---:|---|
+| [binding-of-isaac-like](binding-of-isaac-like) | A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key hidden in a dead end, a locked boss door, five kinds of monster and a boss that charges and fires a cross. | 747 | 2 h 14 | [stream](https://youtu.be/-rA3q0Ju6_c) |
 
 ## Running any of them
 
