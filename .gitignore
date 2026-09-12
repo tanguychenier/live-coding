@@ -1,2 +1,4 @@
 *.love
 *.zip
+*.o
+game
