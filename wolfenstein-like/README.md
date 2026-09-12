@@ -6,7 +6,14 @@
 
 </div>
 
-> **Part 1 of 4.** This game is written across 4 live sessions, and this folder grows with each one.
+> **Written across 4 live sessions**, 1 of them done. This folder grows with each one.
+
+| | | |
+|---|---|---|
+| **Part 1** | the engine itself: one ray per column, and the walls stand up | [watch](https://youtu.be/4QS_gnC-Vz8) · 1 h 09 |
+| Part 2 | textures on the walls, then on the floor and the ceiling | not yet |
+| Part 3 | the world comes out of a file: several kinds of wall, doors, an exit | not yet |
+| Part 4 | it becomes a game: drones that fire back, ammo, medkits, the way out | not yet |
 
 A first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is in main.c.
 
