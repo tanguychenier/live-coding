@@ -20,7 +20,7 @@ code, no cuts, no second take. The commit lands when the stream ends.
 
 One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.
 
-<sub>C and X11 · 401 lines · written live in one sitting · <a href="https://youtu.be/4QS_gnC-Vz8">watch it</a></sub>
+<sub>part 1 of 4 · C and X11 · 401 lines · written live in 1 h 09 · <a href="https://youtu.be/4QS_gnC-Vz8">watch it</a></sub>
 
 </td>
 <td width="50%" valign="top">

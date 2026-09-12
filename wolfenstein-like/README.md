@@ -6,9 +6,11 @@
 
 </div>
 
+> **Part 1 of 4.** This game is written across 4 live sessions, and this folder grows with each one.
+
 A first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is in main.c.
 
-Written from an empty file during a single live session, 401 lines in one sitting:
+Written from an empty file during a single live session, 401 lines in 1 h 09:
 **https://youtu.be/4QS_gnC-Vz8**
 
 <div align="center">
