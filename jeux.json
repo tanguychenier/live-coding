@@ -7,7 +7,8 @@
     "techno": "c",
     "lignes": 401,
     "duree": "1 h 09",
-    "capture": "jeu-1.png"
+    "capture": "jeu-1.png",
+    "chemin_capture": "part-1/captures/jeu-1.png"
   },
   {
     "dossier": "street-fighter-like",

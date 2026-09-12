@@ -1,37 +1,30 @@
 <div align="center">
 
-<img src="banniere.png" alt="wolfenstein-like" width="100%">
+<img src="../banniere.png" alt="wolfenstein-like" width="100%">
 
-[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/4QS_gnC-Vz8) [![C](https://img.shields.io/badge/C-gnu17-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c) [![X11](https://img.shields.io/badge/X11-Xlib-1d2a3a?logo=x.org&logoColor=white)](https://www.x.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
+[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/4QS_gnC-Vz8) [![C](https://img.shields.io/badge/C-gnu17-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c) [![X11](https://img.shields.io/badge/X11-Xlib-1d2a3a?logo=x.org&logoColor=white)](https://www.x.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../../LICENSE)
 
 </div>
 
-> **Written across 4 live sessions**, 1 of them done. Each part has its own folder: the code exactly as it stood when that stream ended.
-
-| | | |
-|---|---|---|
-| **[Part 1](part-1/)** | the engine itself: one ray per column, and the walls stand up | [watch](https://youtu.be/4QS_gnC-Vz8) · 1 h 09 |
-| Part 2 | textures on the walls, then on the floor and the ceiling | not yet |
-| Part 3 | the world comes out of a file: several kinds of wall, doors, an exit | not yet |
-| Part 4 | it becomes a game: drones that fire back, ammo, medkits, the way out | not yet |
+> **Part 1 of 4**, written during one live session. [All the parts](../) of this game.
 
 A first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is in main.c.
 
-
+Written from an empty file during a single live session, 401 lines in 1 h 09:
+**https://youtu.be/4QS_gnC-Vz8**
 
 <div align="center">
 
-<img src="part-1/captures/jeu-1.png" width="49%" alt="the game running">
-<img src="part-1/captures/jeu-2.png" width="49%" alt="the game running">
-<img src="part-1/captures/jeu-3.png" width="49%" alt="the game running">
-<img src="part-1/captures/jeu-4.png" width="49%" alt="the game running">
+<img src="captures/jeu-1.png" width="49%" alt="the game running">
+<img src="captures/jeu-2.png" width="49%" alt="the game running">
+<img src="captures/jeu-3.png" width="49%" alt="the game running">
+<img src="captures/jeu-4.png" width="49%" alt="the game running">
 
 </div>
 
 ## Running it
 
 ```sh
-cd part-1
 gcc -Wall -Wextra -o game main.c -lX11 -lm && ./game
 ```
 

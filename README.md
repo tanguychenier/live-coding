@@ -14,7 +14,7 @@ code, no cuts, no second take. The commit lands when the stream ends.
 <tr>
 <td width="50%" valign="top">
 
-<a href="wolfenstein-like"><img src="wolfenstein-like/captures/jeu-1.png" width="100%" alt="wolfenstein-like"></a>
+<a href="wolfenstein-like"><img src="wolfenstein-like/part-1/captures/jeu-1.png" width="100%" alt="wolfenstein-like"></a>
 
 ### [wolfenstein-like](wolfenstein-like)
 
