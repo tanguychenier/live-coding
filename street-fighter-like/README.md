@@ -1,13 +1,8 @@
 <div align="center">
 
-<img src="banniere.svg" alt="street-fighter-like" width="100%">
+<img src="banniere.png" alt="street-fighter-like" width="100%">
 
-# street-fighter-like
-
-[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/gJOMl3DYnhg)
-[![LÖVE 11.5](https://img.shields.io/badge/L%C3%96VE-11.5-e64998?logo=love&logoColor=white)](https://love2d.org)
-[![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
-[![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
+[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/gJOMl3DYnhg) [![LÖVE 11.5](https://img.shields.io/badge/L%C3%96VE-11.5-e64998?logo=love&logoColor=white)](https://love2d.org) [![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)](https://www.lua.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
 
 </div>
 
@@ -25,11 +20,13 @@ Written from an empty file during a single live session, 665 lines in 2 h 09:
 
 </div>
 
-## Playing
+## Running it
 
 ```sh
 love .
 ```
+
+[LÖVE 11.5](https://love2d.org) is the only thing to install.
 
 | | |
 |---|---|
@@ -66,11 +63,13 @@ second. That freeze is most of what makes a hit feel heavy.
 
 ## Credits
 
-The sprites come from a prototype I wrote in 2019, kept in
-[game_prototype_lua](https://github.com/tanguychenier/game_prototype_lua).
+The four fighters are Calciumtrice's animated sprite sets (Ninja, Samurai,
+Ranger, Shieldmaiden), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/),
+from [OpenGameArt](https://opengameart.org/users/calciumtrice). The parallax
+backgrounds are by Luis Zuno ([@ansimuz](https://ansimuz.com)), CC0.
 
-The sound effects are synthesised rather than taken from a library: nothing to
-license, and each one is tuned to the game.
+The sound effects are synthesised rather than sampled: nothing to license, and
+each one is tuned to the game.
 
 Stream music: Scott Buckley, [scottbuckley.com.au](https://www.scottbuckley.com.au)
 (CC BY 4.0). Outro: AIRGLOW, "Memory Bank" (CC BY 3.0).

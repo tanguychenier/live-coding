@@ -5,7 +5,9 @@
     "video": "gJOMl3DYnhg",
     "lignes": 665,
     "duree": "2 h 09",
-    "capture": "jeu-1.png"
+    "capture": "jeu-1.png",
+    "techno": "lua",
+    "court": "Four fighters, two stages, best of three rounds. The opponent runs a state machine, and left alone the game plays both sides itself."
   },
   {
     "dossier": "binding-of-isaac-like",
@@ -13,6 +15,8 @@
     "video": "-rA3q0Ju6_c",
     "lignes": 747,
     "duree": "2 h 14",
-    "capture": "jeu-1.png"
+    "capture": "jeu-2.png",
+    "techno": "lua",
+    "court": "Twelve rooms grown from a seed, a key in a dead end, a locked boss door, and a boss that charges."
   }
 ]

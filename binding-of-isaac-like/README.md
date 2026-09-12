@@ -1,19 +1,12 @@
 <div align="center">
 
-<img src="banniere.svg" alt="binding-of-isaac-like" width="100%">
+<img src="banniere.png" alt="binding-of-isaac-like" width="100%">
 
-# binding-of-isaac-like
-
-[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/-rA3q0Ju6_c)
-[![LÖVE 11.5](https://img.shields.io/badge/L%C3%96VE-11.5-e64998?logo=love&logoColor=white)](https://love2d.org)
-[![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)](https://www.lua.org)
-[![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
+[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/-rA3q0Ju6_c) [![LÖVE 11.5](https://img.shields.io/badge/L%C3%96VE-11.5-e64998?logo=love&logoColor=white)](https://love2d.org) [![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)](https://www.lua.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
 
 </div>
 
-A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key
-hidden in a dead end, a locked boss door, five kinds of monster and a boss that
-charges and fires a cross.
+A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key hidden in a dead end, a locked boss door, five kinds of monster and a boss that charges and fires a cross.
 
 Written from an empty file during a single live session, 747 lines in 2 h 14:
 **https://youtu.be/-rA3q0Ju6_c**
@@ -27,11 +20,13 @@ Written from an empty file during a single live session, 747 lines in 2 h 14:
 
 </div>
 
-## Playing
+## Running it
 
 ```sh
 love .
 ```
+
+[LÖVE 11.5](https://love2d.org) is the only thing to install.
 
 | | |
 |---|---|
@@ -57,8 +52,8 @@ boss lands on the farthest dead end and the key on the second farthest.
 The sprites come from a prototype I wrote in 2019, kept in
 [game_prototype_lua](https://github.com/tanguychenier/game_prototype_lua).
 
-The sound effects are synthesised rather than taken from a library: nothing to
-license, and each one is tuned to the game.
+The sound effects are synthesised rather than sampled: nothing to license, and
+each one is tuned to the game.
 
 Stream music: Scott Buckley, [scottbuckley.com.au](https://www.scottbuckley.com.au)
 (CC BY 4.0). Outro: AIRGLOW, "Memory Bank" (CC BY 3.0).
