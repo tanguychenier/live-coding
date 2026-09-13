@@ -61,6 +61,9 @@
 #define BRICK_LIGHT  0.78
 #define BRICK_VARY   0.30
 
+// a wall met on a north-south line keeps this much of its light
+#define SIDE_LIGHT   0.68
+
 // the whole world: a wall is anything that is not a dot
 static const char *map[MAP_HEIGHT] = {
 	"########################",
@@ -399,6 +402,28 @@ static void draw_column(int x, int top, int bottom, unsigned int color)
 		view[y * VIEW_WIDTH + x] = color;
 }
 
+// one column of the wall, read down one column of the texture
+static void draw_wall_column(int x, int top, int height, int tex_x,
+	double light, int dark)
+{
+	double step = (double)TEX_SIZE / height;
+	double tex_y = 0.0;
+	int y = top;
+
+	if (y < 0)
+		y = 0;
+
+	int bottom = top + height;
+	if (bottom > VIEW_HEIGHT)
+		bottom = VIEW_HEIGHT;
+
+	for (; y < bottom; y++) {
+		unsigned int color = wall_texture[((int)tex_y & TEX_MASK) * TEX_SIZE + tex_x];
+		view[y * VIEW_WIDTH + x] = shade(color, dark ? light * SIDE_LIGHT : light);
+		tex_y += step;
+	}
+}
+
 // bricks: rows half a brick apart, a mortar line between them, and each
 // brick a shade of its own. drawn once, read a million times
 static void make_wall_texture(void)
@@ -474,11 +499,16 @@ static void render_walls(const struct player *player)
 		int top = HORIZON - height / 2;
 
 		draw_column(x, 0, top, CEILING_COLOR);
+		// where along the wall the ray landed, between 0 and 1. that is
+		// the column of the texture to read
+		double wall_x = side == 0 ? player->y + distance * ray_y
+					  : player->x + distance * ray_x;
+		wall_x -= floor(wall_x);
+		int tex_x = (int)(wall_x * TEX_SIZE);
+
 		// the two orientations must not share a shade, or every corner
 		// disappears
-		double light = fog(distance);
-		draw_column(x, top, top + height,
-			shade(side == 0 ? WALL_LIGHT : WALL_DARK, light));
+		draw_wall_column(x, top, height, tex_x, fog(distance), side == 1);
 		draw_column(x, top + height, VIEW_HEIGHT, FLOOR_COLOR);
 	}
 }
