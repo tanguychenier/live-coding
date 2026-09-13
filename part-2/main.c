@@ -410,8 +410,13 @@ static void draw_wall_column(int x, int top, int height, int tex_x,
 	double tex_y = 0.0;
 	int y = top;
 
-	if (y < 0)
+	// the wall can be taller than the screen: we start reading in the
+	// middle of the texture rather than clamping, or the bricks slide
+	// under our feet as we walk towards them
+	if (y < 0) {
+		tex_y = -top * step;
 		y = 0;
+	}
 
 	int bottom = top + height;
 	if (bottom > VIEW_HEIGHT)
@@ -505,6 +510,10 @@ static void render_walls(const struct player *player)
 					  : player->x + distance * ray_x;
 		wall_x -= floor(wall_x);
 		int tex_x = (int)(wall_x * TEX_SIZE);
+		// the two faces we can see of the same wall must not be mirror
+		// images of each other
+		if ((side == 0 && ray_x > 0) || (side == 1 && ray_y < 0))
+			tex_x = TEX_SIZE - 1 - tex_x;
 
 		// the two orientations must not share a shade, or every corner
 		// disappears
