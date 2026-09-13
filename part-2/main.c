@@ -68,6 +68,15 @@
 #define TILE_LIGHT  0.85
 #define TILE_VARY   0.25
 
+// a panelled ceiling: panels are wide and flat, so a height and not a size,
+// and a coarser grain than stone
+#define PANEL_HEIGHT 16
+#define PANEL_GRAIN  8
+#define PANEL_COLOR  0x343b46
+#define PANEL_JOINT  0x232932
+#define PANEL_LIGHT  0.90
+#define PANEL_VARY   0.15
+
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
 
@@ -126,6 +135,7 @@ static unsigned int view[VIEW_WIDTH * VIEW_HEIGHT];
 
 static unsigned int wall_texture[TEX_SIZE * TEX_SIZE];
 static unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
+static unsigned int ceiling_texture[TEX_SIZE * TEX_SIZE];
 
 // the window at the size of the picture, in the middle of the screen
 static void screen_windowed(struct screen *screen)
@@ -470,6 +480,20 @@ static void make_floor_texture(void)
 	}
 }
 
+// the ceiling: wide panels, darker, so up and down never look alike
+static void make_ceiling_texture(void)
+{
+	for (int y = 0; y < TEX_SIZE; y++) {
+		for (int x = 0; x < TEX_SIZE; x++) {
+			int joint = y % PANEL_HEIGHT == 0;
+			unsigned int color = joint ? PANEL_JOINT
+				: shade(PANEL_COLOR,
+					PANEL_LIGHT + PANEL_VARY * noise(x / PANEL_GRAIN, y));
+			ceiling_texture[y * TEX_SIZE + x] = color;
+		}
+	}
+}
+
 // how far the ray is from the first grid line it will cross
 static double first_line(double position, double direction)
 {
@@ -477,10 +501,10 @@ static double first_line(double position, double direction)
 	return direction < 0 ? cell : 1.0 - cell;
 }
 
-// the ground, one screen row at a time. every pixel of a row is the same
-// distance away, so the walk across the floor is a straight line, and the row
-// costs two additions per pixel
-static void render_floor(const struct player *player)
+// the ground and the sky, one screen row at a time. every pixel of a row is
+// the same distance away, so the walk across the floor is a straight line, and
+// the row costs two additions per pixel
+static void render_floor_and_ceiling(const struct player *player)
 {
 	// the ray through the left edge of the screen. the same for every row,
 	// so it is worked out once
@@ -508,6 +532,7 @@ static void render_floor(const struct player *player)
 			int at = tex_y * TEX_SIZE + tex_x;
 
 			view[y * VIEW_WIDTH + x] = shade(floor_texture[at], light);
+			view[(VIEW_HEIGHT - 1 - y) * VIEW_WIDTH + x] = shade(ceiling_texture[at], light);
 
 			ground_x += step_x;
 			ground_y += step_y;
@@ -563,7 +588,6 @@ static void render_walls(const struct player *player)
 		int height = (int)(VIEW_HEIGHT / distance);
 		int top = HORIZON - height / 2;
 
-		draw_column(x, 0, top, CEILING_COLOR);
 		// where along the wall the ray landed, between 0 and 1. that is
 		// the column of the texture to read
 		double wall_x = side == 0 ? player->y + distance * ray_y
@@ -629,6 +653,7 @@ int main(void)
 	// the textures cost nothing to keep and everything to draw: once, here
 	make_wall_texture();
 	make_floor_texture();
+	make_ceiling_texture();
 
 	struct player player = {
 		.x = 2.5, .y = 6.5,
@@ -654,7 +679,7 @@ int main(void)
 		move_player(&player, player.dir_x * forward + player.plane_x * sideways,
 			player.dir_y * forward + player.plane_y * sideways);
 		turn_player(&player, turn);
-		render_floor(&player);
+		render_floor_and_ceiling(&player);
 		render_walls(&player);
 		show_texture(wall_texture);
 		render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
