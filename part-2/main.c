@@ -16,7 +16,7 @@
 // pixels are not nostalgia, they are four times fewer rays to trace
 #define VIEW_WIDTH  320
 #define VIEW_HEIGHT 200
-#define SCALE       2
+#define SCALE       4
 #define WIN_WIDTH   (VIEW_WIDTH * SCALE)
 #define WIN_HEIGHT  (VIEW_HEIGHT * SCALE)
 #define HORIZON     (VIEW_HEIGHT / 2)
@@ -46,6 +46,20 @@
 
 #define GAME_NAME  "The Keep"
 #define WINDOW_BG  0x182636
+
+// a texture is a square of pixels drawn once at startup. a power of two, so
+// wrapping around it is a bitwise and instead of a division
+#define TEX_SIZE   64
+#define TEX_MASK   (TEX_SIZE - 1)
+
+// a brick wall: the size of one brick, its two colours, and how far one brick
+// is allowed to differ from the next so that the wall is not flat
+#define BRICK_WIDTH  16
+#define BRICK_HEIGHT 8
+#define BRICK_COLOR  0x8a6f5d
+#define BRICK_JOINT  0x4a4038
+#define BRICK_LIGHT  0.78
+#define BRICK_VARY   0.30
 
 // the whole world: a wall is anything that is not a dot
 static const char *map[MAP_HEIGHT] = {
@@ -99,6 +113,8 @@ struct screen {
 
 // every pixel of the game lands here first
 static unsigned int view[VIEW_WIDTH * VIEW_HEIGHT];
+
+static unsigned int wall_texture[TEX_SIZE * TEX_SIZE];
 
 // the window at the size of the picture, in the middle of the screen
 static void screen_windowed(struct screen *screen)
@@ -345,6 +361,16 @@ static void turn_player(struct player *player, double angle)
 	player->plane_y = plane_x * sine + player->plane_y * cosine;
 }
 
+// the same square always gets the same number between 0 and 1: a brick keeps
+// its shade from one frame to the next, and the wall does not crawl. the three
+// constants are arbitrary large odd numbers, any others would do as well
+static double noise(int x, int y)
+{
+	unsigned int n = (unsigned int)(x * 374761393 + y * 668265263);
+	n = (n ^ (n >> 13)) * 1274126177u;
+	return (double)((n >> 16) & 0xffff) / 65535.0;
+}
+
 static unsigned int shade(unsigned int color, double light)
 {
 	if (light > 1.0)
@@ -371,6 +397,25 @@ static void draw_column(int x, int top, int bottom, unsigned int color)
 
 	for (int y = top; y < bottom; y++)
 		view[y * VIEW_WIDTH + x] = color;
+}
+
+// bricks: rows half a brick apart, a mortar line between them, and each
+// brick a shade of its own. drawn once, read a million times
+static void make_wall_texture(void)
+{
+	for (int y = 0; y < TEX_SIZE; y++) {
+		for (int x = 0; x < TEX_SIZE; x++) {
+			int row = y / BRICK_HEIGHT;
+			int shift = (row & 1) ? BRICK_WIDTH / 2 : 0;
+			int column = (x + shift) / BRICK_WIDTH;
+			int joint = y % BRICK_HEIGHT == 0 ||
+				(x + shift) % BRICK_WIDTH == 0;
+			unsigned int color = joint ? BRICK_JOINT
+				: shade(BRICK_COLOR,
+					BRICK_LIGHT + BRICK_VARY * noise(column, row));
+			wall_texture[y * TEX_SIZE + x] = color;
+		}
+	}
 }
 
 // how far the ray is from the first grid line it will cross
@@ -438,6 +483,15 @@ static void render_walls(const struct player *player)
 	}
 }
 
+// a look at what we just made, until the walls can wear it
+static void show_texture(const unsigned int *texture)
+{
+	for (int y = 0; y < TEX_SIZE; y++)
+		for (int x = 0; x < TEX_SIZE; x++)
+			view[y * VIEW_WIDTH + VIEW_WIDTH - TEX_SIZE + x] =
+				texture[y * TEX_SIZE + x];
+}
+
 // the same map, now small enough to live in a corner
 static void render_map(const struct player *player, int cell, int left, int top)
 {
@@ -474,6 +528,9 @@ int main(void)
 	if (!screen_open(&screen))
 		return 1;
 
+	// the textures cost nothing to keep and everything to draw: once, here
+	make_wall_texture();
+
 	struct player player = {
 		.x = 2.5, .y = 6.5,
 		.dir_x = 1.0, .dir_y = 0.0,
@@ -499,6 +556,7 @@ int main(void)
 			player.dir_y * forward + player.plane_y * sideways);
 		turn_player(&player, turn);
 		render_walls(&player);
+		show_texture(wall_texture);
 		render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
 		screen_present(&screen);
 
