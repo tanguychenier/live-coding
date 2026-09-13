@@ -500,13 +500,14 @@ static void render_floor(const struct player *player)
 		double step_y = distance * 2.0 * player->plane_y / VIEW_WIDTH;
 		double ground_x = player->x + distance * left_x;
 		double ground_y = player->y + distance * left_y;
+		double light = fog(distance);
 
 		for (int x = 0; x < VIEW_WIDTH; x++) {
 			int tex_x = (int)(ground_x * TEX_SIZE) & TEX_MASK;
 			int tex_y = (int)(ground_y * TEX_SIZE) & TEX_MASK;
 			int at = tex_y * TEX_SIZE + tex_x;
 
-			view[y * VIEW_WIDTH + x] = floor_texture[at];
+			view[y * VIEW_WIDTH + x] = shade(floor_texture[at], light);
 
 			ground_x += step_x;
 			ground_y += step_y;
