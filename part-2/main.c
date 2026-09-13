@@ -5,8 +5,8 @@
 #include <X11/Xlib.h>
 #include <X11/XKBlib.h>
 #include <X11/keysym.h>
-#include <math.h>
 #include <X11/Xutil.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -21,23 +21,39 @@
 #define WIN_HEIGHT  (VIEW_HEIGHT * SCALE)
 #define HORIZON     (VIEW_HEIGHT / 2)
 
+// XCreateImage wants to know how each row of pixels is padded, in bits. this
+// is NOT the colour depth: 32 is what a modern display expects
+#define SCANLINE_PAD 32
+
 #define MAP_WIDTH  24
 #define MAP_HEIGHT 24
 
 #define WALK_SPEED 3.0
 #define TURN_SPEED 2.2
+#define FRAMES_PER_SECOND 60
 
-#define CEILING_COLOR 0x2a3038
-#define FLOOR_COLOR   0x3a3630
-#define WALL_LIGHT    0x8a93a5
-#define WALL_DARK     0x5d6675
+// where the player stands when the game opens: a free square in the corridor
+#define START_X 2.5
+#define START_Y 6.5
 
 // how wide the view is: 0.66 against a unit direction is about 66 degrees
 #define FIELD_OF_VIEW 0.66
 
+// how fast the light falls off with distance
+#define FOG_DENSITY   0.02
+// never divide by less than this: a wall right against the eye
+#define NEAR_CLIP     0.02
+// a ray parallel to an axis never crosses that axis's grid lines
+#define VERY_FAR      1e30
+
 #define MAP_CELL   3
 #define MAP_LEFT   4
 #define MAP_TOP    4
+
+// the player on the map: half the side of his square, and how many cells long
+// the line showing where he looks
+#define MAP_DOT    2
+#define MAP_ARROW  4
 
 #define MAP_WALL   0x6f7b8f
 #define MAP_FLOOR  0x161a22
@@ -210,7 +226,7 @@ static int screen_resize(struct screen *screen, int width, int height)
 	// XCreateImage copies nothing: we keep writing into our own buffer and
 	// the server reads it from there
 	screen->image = XCreateImage(screen->display, screen->visual, screen->depth,
-		ZPixmap, 0, (char *)pixels, width, height, 32, 0);
+		ZPixmap, 0, (char *)pixels, width, height, SCANLINE_PAD, 0);
 	screen_fit(screen);
 	return screen->image != NULL;
 }
@@ -377,6 +393,7 @@ static void turn_player(struct player *player, double angle)
 	double dir_x = player->dir_x;
 	player->dir_x = dir_x * cosine - player->dir_y * sine;
 	player->dir_y = dir_x * sine + player->dir_y * cosine;
+
 	double plane_x = player->plane_x;
 	player->plane_x = plane_x * cosine - player->plane_y * sine;
 	player->plane_y = plane_x * sine + player->plane_y * cosine;
@@ -396,6 +413,8 @@ static unsigned int shade(unsigned int color, double light)
 {
 	if (light > 1.0)
 		light = 1.0;
+	if (light < 0.0)
+		light = 0.0;
 
 	unsigned int red = (unsigned int)(((color >> 16) & 0xff) * light);
 	unsigned int green = (unsigned int)(((color >> 8) & 0xff) * light);
@@ -403,21 +422,11 @@ static unsigned int shade(unsigned int color, double light)
 	return (red << 16) | (green << 8) | blue;
 }
 
-// far away is dark. one line, and the corridors have depth
+// far away is dark: light is 1 at the eye and falls towards 0 with the
+// square of the distance. one line, and the corridors have depth
 static double fog(double distance)
 {
-	return 1.0 / (1.0 + distance * distance * 0.02);
-}
-
-static void draw_column(int x, int top, int bottom, unsigned int color)
-{
-	if (top < 0)
-		top = 0;
-	if (bottom > VIEW_HEIGHT)
-		bottom = VIEW_HEIGHT;
-
-	for (int y = top; y < bottom; y++)
-		view[y * VIEW_WIDTH + x] = color;
+	return 1.0 / (1.0 + distance * distance * FOG_DENSITY);
 }
 
 // one column of the wall, read down one column of the texture
@@ -540,8 +549,64 @@ static void render_floor_and_ceiling(const struct player *player)
 	}
 }
 
-// one ray per column of the screen. the ray walks the grid square by square
-// until it meets a wall, and how far it went decides how tall to draw it
+// what a ray found: how far it went, which way the wall it met faces, and
+// where along that wall it landed
+struct hit {
+	double distance;
+	double wall_x;
+	int side;
+};
+
+// walk the grid square by square until we meet a wall, always stepping along
+// the axis whose grid line is nearest: no square is missed, and none is
+// visited twice
+static struct hit cast_ray(const struct player *player, double ray_x, double ray_y)
+{
+	int map_x = (int)player->x;
+	int map_y = (int)player->y;
+
+	// the distance the ray covers to cross one whole square
+	double delta_x = ray_x == 0.0 ? VERY_FAR : fabs(1.0 / ray_x);
+	double delta_y = ray_y == 0.0 ? VERY_FAR : fabs(1.0 / ray_y);
+	double side_x = first_line(player->x, ray_x) * delta_x;
+	double side_y = first_line(player->y, ray_y) * delta_y;
+	int step_x = ray_x < 0 ? -1 : 1;
+	int step_y = ray_y < 0 ? -1 : 1;
+
+	// always step along the axis whose grid line is nearest. that is
+	// the whole trick: no square is missed, and none is visited twice
+	int side = 0;
+	while (!is_wall(map_x, map_y)) {
+		if (side_x < side_y) {
+			side_x += delta_x;
+			map_x += step_x;
+			side = 0;
+		} else {
+			side_y += delta_y;
+			map_y += step_y;
+			side = 1;
+		}
+	}
+
+	// how far it went, measured on the camera plane and not from the eye:
+	// from the eye the corners of a wall are farther than its middle, and
+	// a straight wall would bend into a fishbowl
+	double distance = side == 0 ? side_x - delta_x : side_y - delta_y;
+	if (distance < NEAR_CLIP)
+		distance = NEAR_CLIP;
+
+	// where along the wall it landed, between 0 and 1: that is the column
+	// of the texture to read
+	double wall_x = side == 0 ? player->y + distance * ray_y
+		: player->x + distance * ray_x;
+	wall_x -= floor(wall_x);
+
+	struct hit hit = { .distance = distance, .wall_x = wall_x, .side = side };
+	return hit;
+}
+
+// one ray per column of the screen, and how far that ray went decides how
+// tall the wall is drawn: near is tall, far is short
 static void render_walls(const struct player *player)
 {
 	for (int x = 0; x < VIEW_WIDTH; x++) {
@@ -549,69 +614,30 @@ static void render_walls(const struct player *player)
 		double camera = 2.0 * x / VIEW_WIDTH - 1.0;
 		double ray_x = player->dir_x + player->plane_x * camera;
 		double ray_y = player->dir_y + player->plane_y * camera;
+		struct hit hit = cast_ray(player, ray_x, ray_y);
 
-		int map_x = (int)player->x;
-		int map_y = (int)player->y;
-
-		// the distance the ray covers to cross one whole square
-		double delta_x = ray_x == 0.0 ? 1e30 : fabs(1.0 / ray_x);
-		double delta_y = ray_y == 0.0 ? 1e30 : fabs(1.0 / ray_y);
-		double side_x = first_line(player->x, ray_x) * delta_x;
-		double side_y = first_line(player->y, ray_y) * delta_y;
-		int step_x = ray_x < 0 ? -1 : 1;
-		int step_y = ray_y < 0 ? -1 : 1;
-
-		// always step along the axis whose grid line is nearest. that is
-		// the whole trick: no square is missed, and none is visited twice
-		int side = 0;
-		while (!is_wall(map_x, map_y)) {
-			if (side_x < side_y) {
-				side_x += delta_x;
-				map_x += step_x;
-				side = 0;
-			} else {
-				side_y += delta_y;
-				map_y += step_y;
-				side = 1;
-			}
-		}
-
-		// how far the ray actually distance before it hit something
-		double distance = side == 0 ? side_x - delta_x : side_y - delta_y;
-		// measured from the eye, the corners of a wall are farther than its
-		// middle, so a straight wall bends into a fishbowl. what we want is
-		// the distance on the camera plane, and the ray was already giving
-		// it to us before we "corrected" it
-		if (distance < 0.02)
-			distance = 0.02;
-
-		int height = (int)(VIEW_HEIGHT / distance);
+		int height = (int)(VIEW_HEIGHT / hit.distance);
 		int top = HORIZON - height / 2;
 
-		// where along the wall the ray landed, between 0 and 1. that is
-		// the column of the texture to read
-		double wall_x = side == 0 ? player->y + distance * ray_y
-					  : player->x + distance * ray_x;
-		wall_x -= floor(wall_x);
-		int tex_x = (int)(wall_x * TEX_SIZE);
+		int tex_x = (int)(hit.wall_x * TEX_SIZE);
 		// the two faces we can see of the same wall must not be mirror
 		// images of each other
-		if ((side == 0 && ray_x > 0) || (side == 1 && ray_y < 0))
+		if ((hit.side == 0 && ray_x > 0) || (hit.side == 1 && ray_y < 0))
 			tex_x = TEX_SIZE - 1 - tex_x;
 
 		// the two orientations must not share a shade, or every corner
 		// disappears
-		draw_wall_column(x, top, height, tex_x, fog(distance), side == 1);
+		draw_wall_column(x, top, height, tex_x, fog(hit.distance),
+			hit.side == 1);
 	}
 }
 
-// a look at what we just made, until the walls can wear it
-static void show_texture(const unsigned int *texture)
+// one pixel, if it is on the screen at all. the heading line runs off the
+// map, and until now it wrote wherever that landed in memory
+static void put_pixel(int x, int y, unsigned int color)
 {
-	for (int y = 0; y < TEX_SIZE; y++)
-		for (int x = 0; x < TEX_SIZE; x++)
-			view[y * VIEW_WIDTH + VIEW_WIDTH - TEX_SIZE + x] =
-				texture[y * TEX_SIZE + x];
+	if (x >= 0 && x < VIEW_WIDTH && y >= 0 && y < VIEW_HEIGHT)
+		view[y * VIEW_WIDTH + x] = color;
 }
 
 // the same map, now small enough to live in a corner
@@ -622,19 +648,19 @@ static void render_map(const struct player *player, int cell, int left, int top)
 			unsigned int color = is_wall(x, y) ? MAP_WALL : MAP_FLOOR;
 			for (int line = 0; line < cell; line++)
 				for (int column = 0; column < cell; column++)
-					view[(top + y * cell + line) * VIEW_WIDTH
-					     + left + x * cell + column] = color;
+					put_pixel(left + x * cell + column,
+						top + y * cell + line, color);
 		}
 
 	// where we stand, and which way we look
 	int dot_x = left + (int)(player->x * cell);
 	int dot_y = top + (int)(player->y * cell);
-	for (int step = 3; step < 4 * cell; step++)
-		view[(dot_y + (int)(player->dir_y * step)) * VIEW_WIDTH
-		     + dot_x + (int)(player->dir_x * step)] = MAP_HEADING;
-	for (int line = -2; line <= 2; line++)
-		for (int column = -2; column <= 2; column++)
-			view[(dot_y + line) * VIEW_WIDTH + dot_x + column] = MAP_PLAYER;
+	for (int step = MAP_DOT + 1; step < MAP_ARROW * cell; step++)
+		put_pixel(dot_x + (int)(player->dir_x * step),
+			dot_y + (int)(player->dir_y * step), MAP_HEADING);
+	for (int line = -MAP_DOT; line <= MAP_DOT; line++)
+		for (int column = -MAP_DOT; column <= MAP_DOT; column++)
+			put_pixel(dot_x + column, dot_y + line, MAP_PLAYER);
 }
 
 static double now_in_seconds(void)
@@ -655,8 +681,9 @@ int main(void)
 	make_floor_texture();
 	make_ceiling_texture();
 
+	// facing east, with the camera plane across the line of sight
 	struct player player = {
-		.x = 2.5, .y = 6.5,
+		.x = START_X, .y = START_Y,
 		.dir_x = 1.0, .dir_y = 0.0,
 		.plane_x = 0.0, .plane_y = FIELD_OF_VIEW,
 	};
@@ -676,26 +703,27 @@ int main(void)
 		double sideways = (keys.strafe_right - keys.strafe_left) * WALK_SPEED * elapsed;
 		double turn = (keys.right - keys.left) * TURN_SPEED * elapsed;
 
-		move_player(&player, player.dir_x * forward + player.plane_x * sideways,
-			player.dir_y * forward + player.plane_y * sideways);
+		double step_x = player.dir_x * forward + player.plane_x * sideways;
+		double step_y = player.dir_y * forward + player.plane_y * sideways;
+
+		move_player(&player, step_x, step_y);
 		turn_player(&player, turn);
 		render_floor_and_ceiling(&player);
 		render_walls(&player);
-		show_texture(wall_texture);
 		render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
 		screen_present(&screen);
 
-		// nothing here needs more than sixty frames a second, and without
-		// this the loop eats a whole core to draw the same thing twice
-		double spare = 1.0 / 60.0 - (now_in_seconds() - moment);
+		// no need to draw faster than that, and without this the loop
+		// eats a whole core to draw the same thing twice
+		double spare = 1.0 / FRAMES_PER_SECOND - (now_in_seconds() - moment);
 		if (spare > 0)
 			usleep((useconds_t)(spare * 1e6));
-
 	}
 
 	// XDestroyImage frees the buffer it was given, so this is the whole
 	// clean-up: the picture, then the connection
 	XDestroyImage(screen.image);
+	XFreeGC(screen.display, screen.gc);
 	XCloseDisplay(screen.display);
 	return 0;
 }
