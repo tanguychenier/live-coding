@@ -1,14 +1,16 @@
 [
   {
     "dossier": "wolfenstein-like",
-    "resume": "A first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is in main.c.",
+    "resume": "The Keep, a first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is ours.",
     "court": "One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.",
-    "video": "4QS_gnC-Vz8",
-    "techno": "c",
-    "lignes": 401,
-    "duree": "1 h 09",
+    "partie": 2,
+    "total": 4,
+    "video": "SeKs2vCeFUk",
+    "techno": "lua",
+    "lignes": 800,
+    "duree": "1 h 42",
     "capture": "jeu-1.png",
-    "chemin_capture": "part-1/captures/jeu-1.png"
+    "chemin_capture": "part-2/captures/jeu-1.png"
   },
   {
     "dossier": "street-fighter-like",
