@@ -61,6 +61,13 @@
 #define BRICK_LIGHT  0.78
 #define BRICK_VARY   0.30
 
+// a tiled floor: a tile is square, so one size is enough
+#define TILE_SIZE   32
+#define TILE_COLOR  0x4a4a52
+#define TILE_JOINT  0x2e2e34
+#define TILE_LIGHT  0.85
+#define TILE_VARY   0.25
+
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
 
@@ -118,6 +125,7 @@ struct screen {
 static unsigned int view[VIEW_WIDTH * VIEW_HEIGHT];
 
 static unsigned int wall_texture[TEX_SIZE * TEX_SIZE];
+static unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
 
 // the window at the size of the picture, in the middle of the screen
 static void screen_windowed(struct screen *screen)
@@ -448,11 +456,62 @@ static void make_wall_texture(void)
 	}
 }
 
+// the ground: square tiles with a joint, and a grain that keeps the eye busy
+static void make_floor_texture(void)
+{
+	for (int y = 0; y < TEX_SIZE; y++) {
+		for (int x = 0; x < TEX_SIZE; x++) {
+			int joint = x % TILE_SIZE == 0 || y % TILE_SIZE == 0;
+			unsigned int color = joint ? TILE_JOINT
+				: shade(TILE_COLOR,
+					TILE_LIGHT + TILE_VARY * noise(x, y));
+			floor_texture[y * TEX_SIZE + x] = color;
+		}
+	}
+}
+
 // how far the ray is from the first grid line it will cross
 static double first_line(double position, double direction)
 {
 	double cell = position - floor(position);
 	return direction < 0 ? cell : 1.0 - cell;
+}
+
+// the ground, one screen row at a time. every pixel of a row is the same
+// distance away, so the walk across the floor is a straight line, and the row
+// costs two additions per pixel
+static void render_floor(const struct player *player)
+{
+	// the ray through the left edge of the screen. the same for every row,
+	// so it is worked out once
+	double left_x = player->dir_x - player->plane_x;
+	double left_y = player->dir_y - player->plane_y;
+
+	for (int y = HORIZON + 1; y < VIEW_HEIGHT; y++) {
+		// how far the ground under this row is: a row one pixel below
+		// the horizon is very far, the bottom row is right at our feet,
+		// and the eye is half a wall above the floor
+		double distance = (double)VIEW_HEIGHT / (2 * y - VIEW_HEIGHT);
+
+		// where that row starts on the floor, and what one pixel to the
+		// right is worth. the camera plane spans from -plane to +plane,
+		// so the whole row is two planes wide
+		double step_x = distance * 2.0 * player->plane_x / VIEW_WIDTH;
+		double step_y = distance * 2.0 * player->plane_y / VIEW_WIDTH;
+		double ground_x = player->x + distance * left_x;
+		double ground_y = player->y + distance * left_y;
+
+		for (int x = 0; x < VIEW_WIDTH; x++) {
+			int tex_x = (int)(ground_x * TEX_SIZE) & TEX_MASK;
+			int tex_y = (int)(ground_y * TEX_SIZE) & TEX_MASK;
+			int at = tex_y * TEX_SIZE + tex_x;
+
+			view[y * VIEW_WIDTH + x] = floor_texture[at];
+
+			ground_x += step_x;
+			ground_y += step_y;
+		}
+	}
 }
 
 // one ray per column of the screen. the ray walks the grid square by square
@@ -518,7 +577,6 @@ static void render_walls(const struct player *player)
 		// the two orientations must not share a shade, or every corner
 		// disappears
 		draw_wall_column(x, top, height, tex_x, fog(distance), side == 1);
-		draw_column(x, top + height, VIEW_HEIGHT, FLOOR_COLOR);
 	}
 }
 
@@ -569,6 +627,7 @@ int main(void)
 
 	// the textures cost nothing to keep and everything to draw: once, here
 	make_wall_texture();
+	make_floor_texture();
 
 	struct player player = {
 		.x = 2.5, .y = 6.5,
@@ -594,6 +653,7 @@ int main(void)
 		move_player(&player, player.dir_x * forward + player.plane_x * sideways,
 			player.dir_y * forward + player.plane_y * sideways);
 		turn_player(&player, turn);
+		render_floor(&player);
 		render_walls(&player);
 		show_texture(wall_texture);
 		render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
