@@ -16,11 +16,11 @@ code, no cuts, no second take. The commit lands when the stream ends.
 
 <a href="wolfenstein-like"><img src="wolfenstein-like/part-2/captures/jeu-1.png" width="100%" alt="wolfenstein-like"></a>
 
-### [wolfenstein-like](wolfenstein-like)
+### [The Keep](wolfenstein-like)
 
 One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.
 
-<sub>Lua and LOVE 2D · 800 lines · written live in 1 h 42 · <a href="https://youtu.be/SeKs2vCeFUk">watch it</a></sub>
+<sub>C and X11 · 795 lines · written live in 1 h 42 · <a href="https://youtu.be/SeKs2vCeFUk">watch it</a></sub>
 
 </td>
 <td width="50%" valign="top">
