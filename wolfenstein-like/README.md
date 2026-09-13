@@ -2,7 +2,7 @@
 
 <img src="banniere.png" alt="wolfenstein-like" width="100%">
 
-[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/SeKs2vCeFUk) [![LÖVE 11.5](https://img.shields.io/badge/L%C3%96VE-11.5-e64998?logo=love&logoColor=white)](https://love2d.org) [![Lua 5.1](https://img.shields.io/badge/Lua-5.1-2C2D72?logo=lua&logoColor=white)](https://www.lua.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
+[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/SeKs2vCeFUk) [![C](https://img.shields.io/badge/C-gnu17-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c) [![X11](https://img.shields.io/badge/X11-Xlib-1d2a3a?logo=x.org&logoColor=white)](https://www.x.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
 
 </div>
 
@@ -32,10 +32,10 @@ The Keep, a first-person 3D engine written in C: one ray per column of the scree
 
 ```sh
 cd part-2
-love .
+gcc -Wall -Wextra -Iinclude -o game src/main.c src/render.c src/screen.c src/texture.c src/world.c -lX11 -lm && ./game
 ```
 
-[LÖVE 11.5](https://love2d.org) is the only thing to install.
+Nothing to install but a C compiler and the X11 headers (`libx11-dev` on Debian and Ubuntu).
 
 | | |
 |---|---|
@@ -45,7 +45,7 @@ love .
 | `escape` | quit |
 
 No engine, no library, no framework. X11 gives a window and a block of memory;
-everything else is in `main.c`, and one line of gcc builds it.
+everything else lives in `src/`, five files doing one job each, and one line of gcc builds them.
 
 ## How the walls are drawn
 
