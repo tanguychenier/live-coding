@@ -89,6 +89,11 @@ struct screen {
 	XImage  *image;
 	Atom     close_message;
 	unsigned int *pixels;
+	// the window is the player's to resize; the picture keeps its own size
+	Visual *visual;
+	int depth;
+	int width, height;
+	int scale, left, top;
 	int full;                   // are we filling the screen?
 };
 
@@ -129,6 +134,50 @@ static void screen_toggle_fullscreen(struct screen *screen)
 	XFlush(screen->display);
 }
 
+// how big a block each view pixel becomes, and where the picture sits in the
+// window. a whole number of pixels per pixel, or the walls shimmer
+static void screen_fit(struct screen *screen)
+{
+	int by_width = screen->width / VIEW_WIDTH;
+	int by_height = screen->height / VIEW_HEIGHT;
+
+	screen->scale = by_width < by_height ? by_width : by_height;
+	if (screen->scale < 1)
+		screen->scale = 1;
+	// a window smaller than the picture would give a negative corner, and we
+	// would copy pixels in front of the buffer
+	screen->left = (screen->width - VIEW_WIDTH * screen->scale) / 2;
+	if (screen->left < 0)
+		screen->left = 0;
+	screen->top = (screen->height - VIEW_HEIGHT * screen->scale) / 2;
+	if (screen->top < 0)
+		screen->top = 0;
+}
+
+// a new window size means a new buffer and a new image. XDestroyImage frees
+// the pixels it was handed, so the old buffer goes with the old image
+static int screen_resize(struct screen *screen, int width, int height)
+{
+	unsigned int *pixels = malloc((size_t)width * height * sizeof(unsigned int));
+	if (!pixels) {
+		fprintf(stderr, "out of memory\n");
+		return 0;
+	}
+
+	if (screen->image)
+		XDestroyImage(screen->image);
+
+	screen->pixels = pixels;
+	screen->width = width;
+	screen->height = height;
+	// XCreateImage copies nothing: we keep writing into our own buffer and
+	// the server reads it from there
+	screen->image = XCreateImage(screen->display, screen->visual, screen->depth,
+		ZPixmap, 0, (char *)pixels, width, height, 32, 0);
+	screen_fit(screen);
+	return screen->image != NULL;
+}
+
 static int screen_open(struct screen *screen)
 {
 	screen->display = XOpenDisplay(NULL);
@@ -149,6 +198,12 @@ static int screen_open(struct screen *screen)
 	XSetClassHint(screen->display, screen->window, &class_hint);
 	XStoreName(screen->display, screen->window, GAME_NAME);
 
+	// the window may grow as much as it likes, but never below the picture:
+	// under that there is nothing left to show
+	XSizeHints hints = { .flags = PMinSize,
+		.min_width = VIEW_WIDTH, .min_height = VIEW_HEIGHT };
+	XSetWMNormalHints(screen->display, screen->window, &hints);
+
 	// without this the close button cuts the connection under our feet;
 	// with it we get a message and we decide what to do
 	screen->close_message = XInternAtom(screen->display, "WM_DELETE_WINDOW", False);
@@ -159,23 +214,23 @@ static int screen_open(struct screen *screen)
 	Bool supported;
 	XkbSetDetectableAutoRepeat(screen->display, True, &supported);
 
-	XSelectInput(screen->display, screen->window, KeyPressMask | KeyReleaseMask);
+	// StructureNotifyMask is what tells us the window changed size. without
+	// it the picture stays in the corner when the window grows
+	XSelectInput(screen->display, screen->window,
+		KeyPressMask | KeyReleaseMask | StructureNotifyMask);
 
 	screen_windowed(screen);
 	XMapWindow(screen->display, screen->window);
 	screen->gc = XCreateGC(screen->display, screen->window, 0, NULL);
+
+	screen->visual = visual;
+	screen->depth = depth;
+	screen->image = NULL;
 	screen->full = 0;
 
-	// XCreateImage copies nothing: we keep writing into our own buffer and
-	// the server reads it from there
-	screen->pixels = malloc(WIN_WIDTH * WIN_HEIGHT * sizeof(unsigned int));
-	if (!screen->pixels) {
-		fprintf(stderr, "out of memory\n");
+	if (!screen_resize(screen, WIN_WIDTH, WIN_HEIGHT))
 		return 0;
-	}
 
-	screen->image = XCreateImage(screen->display, visual, depth, ZPixmap, 0,
-		(char *)screen->pixels, WIN_WIDTH, WIN_HEIGHT, 32, 0);
 	XFlush(screen->display);
 	return 1;
 }
@@ -193,6 +248,13 @@ static void screen_read_keys(struct screen *screen, struct keys *keys)
 		if (event.type == ClientMessage &&
 		    (Atom)event.xclient.data.l[0] == screen->close_message)
 			keys->quit = 1;
+
+		// the server tells us the new size; the picture follows it
+		if (event.type == ConfigureNotify &&
+		    (event.xconfigure.width != screen->width ||
+		     event.xconfigure.height != screen->height))
+			screen_resize(screen, event.xconfigure.width,
+				event.xconfigure.height);
 
 		if (event.type == KeyPress || event.type == KeyRelease) {
 			int down = event.type == KeyPress;
@@ -218,19 +280,33 @@ static void screen_read_keys(struct screen *screen, struct keys *keys)
 // blow the 320x200 view up into the window, one source pixel per block
 static void screen_present(struct screen *screen)
 {
+	// whatever the picture does not cover stays the window colour
+	for (int i = 0; i < screen->width * screen->height; i++)
+		screen->pixels[i] = WINDOW_BG;
+
+	int scale = screen->scale;
+	// a window narrower than the picture: we draw the columns that fit, and
+	// this does not change from one row to the next
+	int visible = (screen->width - screen->left) / scale;
+	if (visible > VIEW_WIDTH)
+		visible = VIEW_WIDTH;
 	for (int y = 0; y < VIEW_HEIGHT; y++) {
 		unsigned int *row = view + y * VIEW_WIDTH;
-		for (int copy = 0; copy < SCALE; copy++) {
-			unsigned int *out = screen->pixels + (y * SCALE + copy) * WIN_WIDTH;
-			for (int x = 0; x < VIEW_WIDTH; x++) {
+		for (int copy = 0; copy < scale; copy++) {
+			int line = screen->top + y * scale + copy;
+			if (line >= screen->height)
+				continue;
+			unsigned int *out = screen->pixels + line * screen->width
+				+ screen->left;
+			for (int x = 0; x < visible; x++) {
 				unsigned int color = row[x];
-				for (int again = 0; again < SCALE; again++)
+				for (int again = 0; again < scale; again++)
 					*out++ = color;
 			}
 		}
 	}
 	XPutImage(screen->display, screen->window, screen->gc, screen->image,
-		0, 0, 0, 0, WIN_WIDTH, WIN_HEIGHT);
+		0, 0, 0, 0, screen->width, screen->height);
 	XFlush(screen->display);
 }
 
@@ -433,6 +509,10 @@ int main(void)
 			usleep((useconds_t)(spare * 1e6));
 
 	}
+
+	// XDestroyImage frees the buffer it was given, so this is the whole
+	// clean-up: the picture, then the connection
+	XDestroyImage(screen.image);
 	XCloseDisplay(screen.display);
 	return 0;
 }
