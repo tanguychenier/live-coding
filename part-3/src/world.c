@@ -143,6 +143,16 @@ int is_door(int x, int y)
 	return map[y][x] == '+';
 }
 
+// a strip sits on a wall: the file puts a letter where the wall would be,
+// and that letter carries the neon
+int is_lamp(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	return map[y][x] == 'T';
+}
+
 double door_at(int x, int y)
 {
 	if (x < 0 || y < 0 || x >= map_width || y >= map_height
@@ -159,6 +169,8 @@ int wall_kind(int x, int y)
 	    || x >= (int)strlen(map[y]))
 		return 0;
 	char c = map[y][x];
+	if (c == 'T')
+		return LAMP_TEXTURE;
 	if (c >= '1' && c < '1' + WALL_KINDS)
 		return c - '1';
 	return 0;

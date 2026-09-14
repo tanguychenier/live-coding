@@ -35,13 +35,21 @@ struct plate {
 #define DOOR_BAND  22          // how tall the hazard band is
 #define DOOR_STRIPE 10         // how wide one stripe is
 
+// the neon is the only thing in the level that shines, and it is what gives
+// its colour to everything else
+#define NEON_CORE  0xeafffb
+#define NEON_TUBE  0x9ff0e4
+#define NEON_EDGE  0x3aa896
+#define HOUSING    0x1a1f28    // the metal housing that holds it
+
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
 
 // several kinds of wall, so one room is not the next: a panel size and four
 // colours, still drawn in code
-#define WALL_KINDS 4
-#define DOOR_TEXTURE 3         // which of the four is the door
+#define WALL_KINDS 5
+#define DOOR_TEXTURE 3         // which of the five is the door
+#define LAMP_TEXTURE 4         // and the wall that carries a strip
 
 extern unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 extern unsigned int floor_texture[TEX_SIZE * TEX_SIZE];

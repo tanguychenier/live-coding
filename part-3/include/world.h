@@ -22,6 +22,7 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 		 double *dir_x, double *dir_y);
 int is_wall(int x, int y);
 int wall_kind(int x, int y);
+int is_lamp(int x, int y);
 // a door takes a second to open, and once it is open this far one walks
 // between the two leaves
 #define DOOR_SECONDS  1.2
