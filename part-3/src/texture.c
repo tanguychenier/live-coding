@@ -3,6 +3,8 @@
 #include "render.h"
 #include "text.h"
 
+#include <math.h>
+
 unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
 unsigned int ceiling_texture[TEX_SIZE * TEX_SIZE];
@@ -248,6 +250,30 @@ void make_wall_textures(void)
 }
 
 // the floor: dark tiles, tight, no rivets
+// a plate set into the tile: a rim that shines, a chip in the middle, and a
+// glow that spills onto the tiling around it
+unsigned int badge_tile(int x, int y)
+{
+	double dx = x - TEX_SIZE / 2.0, dy = y - TEX_SIZE / 2.0;
+	double inside = fabs(dx) > fabs(dy) ? fabs(dx) : fabs(dy);
+	unsigned int ground = floor_texture[y * TEX_SIZE + x];
+
+	if (inside > BADGE_R + BADGE_HALO)
+		return ground;
+	if (inside > BADGE_R)
+		return mix(ground, BADGE_EDGE,
+			0.45 * (1.0 - (inside - BADGE_R) / BADGE_HALO));
+	if (inside > BADGE_R - 5.0)
+		return BADGE_EDGE;
+	if (inside > BADGE_R - 8.0)
+		return mix(BADGE_BODY, 0x000000, 0.4);
+	// the chip: three lines, like on a card
+	if (fabs(dy) < 12.0 && fabs(dx) < 16.0
+	    && ((int)(dy + 12.0) / 8) % 2 == 0)
+		return mix(BADGE_EDGE, BADGE_BODY, 0.35);
+	return mix(BADGE_BODY, BADGE_EDGE, 0.18);
+}
+
 unsigned int stencil_tile(int x, int y, int cell)
 {
 	unsigned int ground = floor_texture[y * TEX_SIZE + x];

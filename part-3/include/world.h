@@ -27,6 +27,10 @@ int is_lamp(int x, int y);
 #define STENCIL_X 8
 #define STENCIL_Y 3
 int stencil_at(int x, int y);
+int is_badge(int x, int y);
+int have_badge(void);
+// gives 1 on the frame the badge is picked up
+int walk_over(const struct player *player);
 // how far the player remembers what has been seen
 #define SEEN_REACH 4
 
@@ -45,6 +49,8 @@ int lamp_faulty(int x, int y);
 int is_door(int x, int y);
 // from 0 (shut) to 1 (both leaves tucked into the wall)
 double door_at(int x, int y);
+// is there a shut door in front of us, within reach?
+int door_ahead(const struct player *player);
 void push_door(const struct player *player);
 void move_doors(double elapsed);
 void move_player(struct player *player, double step_x, double step_y);

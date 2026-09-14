@@ -112,21 +112,38 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 	face_the_open(*start_x, *start_y, dir_x, dir_y);
 }
 
-// we look a few steps ahead, not at arm's length: nobody walks into a door
-// to open it, one pushes it from where one stands
-void push_door(const struct player *player)
+// the door in front of us, if there is a shut one within reach. a few steps
+// ahead, not at arm's length: one pushes a door from where one stands.
+static int door_in_front(const struct player *player, int *door_x, int *door_y)
 {
 	for (double d = 0.6; d <= DOOR_REACH; d += 0.4) {
 		int x = (int)(player->x + player->dir_x * d);
 		int y = (int)(player->y + player->dir_y * d);
 		if (is_door(x, y)) {
-			if (doors[y * map_width + x] == 0.0)
-				doors[y * map_width + x] = 0.001;
-			return;
+			*door_x = x;
+			*door_y = y;
+			return door_at(x, y) == 0.0;
 		}
 		if (is_wall(x, y))
-			return;              // a wall between us: nothing to push
+			return 0;             // a wall between us: nothing to push
 	}
+	return 0;
+}
+
+// a game never asks for a key without saying so: the line shown on screen
+// comes out of this function.
+int door_ahead(const struct player *player)
+{
+	int x, y;
+	return door_in_front(player, &x, &y);
+}
+
+// we nudge it once: after that the two leaves finish their travel
+void push_door(const struct player *player)
+{
+	int x, y;
+	if (door_in_front(player, &x, &y))
+		doors[y * map_width + x] = 0.001;
 }
 
 // the two leaves take a second to part, and they never close again: coming
@@ -169,6 +186,24 @@ void remember(const struct player *player)
 
 // the studio name, painted on the airlock floor. gives back which of the
 // four squares we are looking at, or -1 if it is none of them.
+// the badge. a way out and nothing else to look for is a corridor, not a
+// level: the hatch is locked, and what opens it is down in the hold.
+static int badge_taken;
+
+int have_badge(void)
+{
+	return badge_taken;
+}
+
+// gives 1 on the frame the badge is picked up, so it can be said
+int walk_over(const struct player *player)
+{
+	if (!is_badge((int)player->x, (int)player->y))
+		return 0;
+	badge_taken = 1;
+	return 1;
+}
+
 int stencil_at(int x, int y)
 {
 	// the squares follow one another across the walk: that is how the letters
@@ -195,6 +230,17 @@ int is_lamp(int x, int y)
 		return 0;
 	char c = map[y][x];
 	return c == 'T' || c == 'R' || c == 'B' || c == 'F';
+}
+
+// we pick it up by walking over it: a chest would be a block that eats
+// the screen, a plate on the floor is seen from far off
+int is_badge(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	char c = map[y][x];
+	return c == 'K' && !badge_taken;
 }
 
 // a tube at the end of its life. "F" for failing: it holds, it drops, it
@@ -244,7 +290,7 @@ int is_wall(int x, int y)
 	char c = map[y][x];
 	if (c == '+')
 		return door_at(x, y) < DOOR_WALKABLE;
-	return !(c == '.' || c == 'S' || c == 'E');
+	return !(c == '.' || c == 'S' || c == 'E' || c == 'K');
 }
 
 // the camera plane follows the shape of the window. its length is the field

@@ -9,9 +9,21 @@
 
 #include "render.h"
 #include "light.h"
+#include "text.h"
 #include "screen.h"
 #include "texture.h"
 #include "world.h"
+
+// a game says what can be done at the moment it can be done, and holds its
+// tongue the rest of the time.
+static const char *notice;
+static double notice_until;
+
+static void say(const char *line, double moment)
+{
+	notice = line;
+	notice_until = moment + NOTICE_SECONDS;
+}
 
 static double now_in_seconds(void)
 {
@@ -47,6 +59,10 @@ int main(void)
 		    &player.dir_x, &player.dir_y);
 	struct keys keys = { .map = 1 };
 	double last = now_in_seconds();
+	// the first thing one reads, and the only one nobody triggers
+	say("ARROWS TO MOVE    M FOR THE MAP", last);
+	// when the hatch opened: we leave time to read it
+	double left_at = 0.0;
 
 	while (!keys.quit) {
 		double moment = now_in_seconds();
@@ -55,17 +71,30 @@ int main(void)
 
 		screen_read_keys(&screen, &keys);
 
+		// a door that opens by itself teaches nothing; a door that
+		// asks for a key and says so does
+		if (door_ahead(&player))
+			say("PRESS SPACE TO OPEN", moment);
 		if (keys.push) {
 			push_door(&player);
 			keys.push = 0;
 		}
+		if (walk_over(&player))
+			say("SECURITY BADGE TAKEN", moment);
 		move_doors(elapsed);
 		lamp_flicker(moment);
 		remember(&player);
 
-		// the way out. the level had no end: one walked until one
-		// stopped. standing on it closes the keep behind us.
-		if ((int)player.x == exit_x && (int)player.y == exit_y)
+		// the way out, and it wants the badge
+		if ((int)player.x == exit_x && (int)player.y == exit_y) {
+			if (!have_badge())
+				say("THE HATCH IS LOCKED", moment);
+			else if (left_at == 0.0) {
+				left_at = moment;
+				say("THE HATCH OPENS", moment);
+			}
+		}
+		if (left_at > 0.0 && moment - left_at > NOTICE_SECONDS)
 			keys.quit = 1;
 
 		// every move is scaled by the time the last frame took, so the game
@@ -84,6 +113,9 @@ int main(void)
 		render_walls(&player);
 		if (keys.map)
 			render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
+		if (moment < notice_until)
+			draw_text_centered(view_height - NOTICE_UP, notice,
+				TEXT_COLOR, TEXT_SCALE);
 		screen_present(&screen);
 
 		// no need to draw faster than that, and without this the loop

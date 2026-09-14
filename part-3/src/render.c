@@ -82,9 +82,13 @@ void render_floor_and_ceiling(const struct player *player)
 			if (light > 1.0)
 				light = 1.0;
 			int painted = stencil_at((int)ground_x, (int)ground_y);
-			unsigned int ground = painted >= 0
-				? stencil_tile(tex_x, tex_y, painted) : floor_texture[at];
-			view[y * view_width + x] = tint(ground, light, GLOOM);
+			// the badge shines with a light of its own: it is seen
+			// from the far end of the hold
+			int on_badge = is_badge((int)ground_x, (int)ground_y);
+			unsigned int ground = on_badge ? badge_tile(tex_x, tex_y)
+				: painted >= 0 ? stencil_tile(tex_x, tex_y, painted)
+				: floor_texture[at];
+			view[y * view_width + x] = tint(ground, on_badge ? 1.0 : light, GLOOM);
 			view[(view_height - 1 - y) * view_width + x] =
 				tint(ceiling_texture[at], light * CEILING_PART, GLOOM);
 

@@ -59,6 +59,8 @@ struct plate {
 unsigned int tint(unsigned int color, double lamp, double night);
 // the painted tile: `cell` says which of the four we are looking at
 unsigned int stencil_tile(int x, int y, int cell);
+// and the tile the badge sleeps on, read where the floor is read
+unsigned int badge_tile(int x, int y);
 
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
@@ -81,6 +83,12 @@ unsigned int stencil_tile(int x, int y, int cell);
 #define STENCIL_PAD   10       // the margin around a letter, in pixels
 #define STENCIL_PAINT 0xb9c6cf
 #define STENCIL_WEAR  0.72     // the paint is worn, not fresh
+
+// the badge: a plate set into the tile, it shines, and one goes to get it
+#define BADGE_BODY 0x1d5f5a
+#define BADGE_EDGE 0x8ff0e0
+#define BADGE_R    36.0        // half the side of the plate
+#define BADGE_HALO 22.0        // and how far its glow spills on the tile
 
 extern unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 extern unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
