@@ -24,7 +24,7 @@ Written from an empty file during a single live session, 1907 lines in 3 h 43:
 ## Running it
 
 ```sh
-gcc -Wall -Wextra -Iinclude -o game src/light.c src/main.c src/render.c src/screen.c src/text.c src/texture.c src/world.c -lX11 -lm && ./game
+gcc -Wall -Wextra -O2 -Iinclude -o game src/light.c src/main.c src/render.c src/screen.c src/text.c src/texture.c src/world.c -lX11 -lm && ./game
 ```
 
 A C compiler and the X11 headers (`libx11-dev` on Debian and Ubuntu). Nothing else.
