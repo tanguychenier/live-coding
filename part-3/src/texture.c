@@ -153,10 +153,15 @@ static const struct plate ROOF = {
 };
 
 // the ordinary wall of the gangway
+// the three colours of a tube, from the core to the edge
+static const unsigned int NEON[3] = { NEON_CORE, NEON_TUBE, NEON_EDGE };
+static const unsigned int ALARM[3] = { ALARM_CORE, ALARM_TUBE, ALARM_EDGE };
+static const unsigned int COLD[3] = { COLD_CORE, COLD_TUBE, COLD_EDGE };
+
 // a neon strip in its housing: the housing, the tube, and the glow around
 // it. without the glow the tube is a white rectangle stuck on the wall
 static void neon_strip(unsigned int *out, int cx, int cy, int half_w,
-	int half_h)
+	int half_h, const unsigned int *glow)
 {
 	for (int y = 0; y < TEX_SIZE; y++)
 		for (int x = 0; x < TEX_SIZE; x++) {
@@ -171,8 +176,8 @@ static void neon_strip(unsigned int *out, int cx, int cy, int half_w,
 			if (dx <= half_w && dy <= half_h) {
 				// the tube: white at the core, teal at the edge
 				double edge = (double)dx / (half_w + 1);
-				out[y * TEX_SIZE + x] = edge < 0.45 ? NEON_CORE
-					: edge < 0.8 ? NEON_TUBE : NEON_EDGE;
+				out[y * TEX_SIZE + x] = edge < 0.45 ? glow[0]
+					: edge < 0.8 ? glow[1] : glow[2];
 			}
 		}
 	// and the glow, dying with the square of the distance
@@ -186,7 +191,7 @@ static void neon_strip(unsigned int *out, int cx, int cy, int half_w,
 			if (d >= 1.0 || (dx <= half_w + 4 && dy <= half_h + 4))
 				continue;
 			out[y * TEX_SIZE + x] = mix(out[y * TEX_SIZE + x],
-				NEON_TUBE, 0.40 * (1.0 - d) * (1.0 - d));
+				glow[1], 0.40 * (1.0 - d) * (1.0 - d));
 		}
 }
 
@@ -223,10 +228,11 @@ static void make_door(unsigned int *out)
 }
 
 // the wall that carries a strip: sheet metal, with the neon in it
-static void make_lamp_wall(unsigned int *out, const struct plate *p)
+static void make_lamp_wall(unsigned int *out, const struct plate *p,
+	const unsigned int *glow)
 {
 	make_plating(out, p);
-	neon_strip(out, TEX_SIZE / 2, TEX_SIZE / 2, 4, 34);
+	neon_strip(out, TEX_SIZE / 2, TEX_SIZE / 2, 4, 34, glow);
 }
 
 void make_wall_textures(void)
@@ -235,7 +241,9 @@ void make_wall_textures(void)
 	make_plating(wall_texture[1], &HULL);
 	make_plating(wall_texture[2], &PARTITION);
 	make_door(wall_texture[3]);
-	make_lamp_wall(wall_texture[4], &HULL);
+	make_lamp_wall(wall_texture[4], &HULL, NEON);
+	make_lamp_wall(wall_texture[5], &BULK, ALARM);
+	make_lamp_wall(wall_texture[6], &PARTITION, COLD);
 }
 
 // the floor: dark tiles, tight, no rivets
@@ -249,5 +257,5 @@ void make_floor_texture(void)
 void make_ceiling_texture(void)
 {
 	make_plating(ceiling_texture, &ROOF);
-	neon_strip(ceiling_texture, TEX_SIZE / 2, TEX_SIZE / 2, 34, 5);
+	neon_strip(ceiling_texture, TEX_SIZE / 2, TEX_SIZE / 2, 34, 5, NEON);
 }

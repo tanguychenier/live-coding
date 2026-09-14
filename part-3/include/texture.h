@@ -40,6 +40,12 @@ struct plate {
 #define NEON_CORE  0xeafffb
 #define NEON_TUBE  0x9ff0e4
 #define NEON_EDGE  0x3aa896
+#define ALARM_CORE 0xffe9c2
+#define ALARM_TUBE 0xf0a53c
+#define ALARM_EDGE 0x8c3c10
+#define COLD_CORE  0xf4f8ff
+#define COLD_TUBE  0xbcd2f0
+#define COLD_EDGE  0x5070a0
 #define HOUSING    0x1a1f28    // the metal housing that holds it
 
 // the colour of light: a plate under a neon and the same plate in shadow
@@ -57,9 +63,13 @@ unsigned int tint(unsigned int color, double lamp, double night);
 
 // several kinds of wall, so one room is not the next: a panel size and four
 // colours, still drawn in code
-#define WALL_KINDS 5
-#define DOOR_TEXTURE 3         // which of the five is the door
-#define LAMP_TEXTURE 4         // and the wall that carries a strip
+#define WALL_KINDS 7
+#define DOOR_TEXTURE 3         // which of the seven is the door
+// three colours of strip, one per zone: the gangway in service, the machine
+// room, and the hold on its emergency lighting
+#define LAMP_TEXTURE 4         // the ordinary strip, teal
+#define ALARM_TEXTURE 5        // the emergency one, amber
+#define COLD_TEXTURE 6         // and the cold white of the machines
 
 extern unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 extern unsigned int floor_texture[TEX_SIZE * TEX_SIZE];

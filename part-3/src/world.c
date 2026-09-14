@@ -150,7 +150,18 @@ int is_lamp(int x, int y)
 	if (x < 0 || y < 0 || x >= map_width || y >= map_height
 	    || x >= (int)strlen(map[y]))
 		return 0;
-	return map[y][x] == 'T';
+	char c = map[y][x];
+	return c == 'T' || c == 'R' || c == 'B' || c == 'F';
+}
+
+// a tube at the end of its life. "F" for failing: it holds, it drops, it
+// comes back. this is not a ripple, it is a wobble that no longer passes.
+int lamp_faulty(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	return map[y][x] == 'F';
 }
 
 double door_at(int x, int y)
@@ -169,8 +180,12 @@ int wall_kind(int x, int y)
 	    || x >= (int)strlen(map[y]))
 		return 0;
 	char c = map[y][x];
-	if (c == 'T')
+	if (c == 'T' || c == 'F')
 		return LAMP_TEXTURE;
+	if (c == 'R')
+		return ALARM_TEXTURE;
+	if (c == 'B')
+		return COLD_TEXTURE;
 	if (c >= '1' && c < '1' + WALL_KINDS)
 		return c - '1';
 	return 0;

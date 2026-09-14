@@ -11,6 +11,9 @@
 // a neon pulses, very little and very fast
 #define LAMP_HUM     0.035
 #define LAMP_HZ      9.0
+// and a failing tube goes out for good for the length of a beat
+#define FAULT_LOW    0.10
+#define FAULT_HALF   0.62
 
 // a surface facing us takes the light, one seen edge on does not: without
 // that, everything close by shines like a glowing camera

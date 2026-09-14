@@ -4,8 +4,10 @@
 #include <math.h>
 #include <stdlib.h>
 
-// what the neons are worth at this instant, around 1
+// what the neons are worth at this instant, around 1, and what a failing
+// tube is worth, which is another matter
 static double neon = 1.0;
+static double fault = 1.0;
 
 // two waves at unrelated speeds never repeat: the eye stops finding a
 // pattern in them.
@@ -13,6 +15,13 @@ void lamp_flicker(double seconds)
 {
 	neon = 1.0 + LAMP_HUM * (sin(seconds * LAMP_HZ)
 				 + 0.6 * sin(seconds * LAMP_HZ * 2.37));
+
+	// the failing tube does not modulate, it cuts: three unrelated
+	// waves, two thresholds, and the wobble seems to give up.
+	double wobble = sin(seconds * 13.7) + sin(seconds * 4.3)
+		+ sin(seconds * 31.1) * 0.5;
+	fault = wobble > 1.15 ? FAULT_LOW
+		: wobble > 0.55 ? FAULT_HALF : neon;
 }
 
 // the light falls with the square of the distance, like the real thing, and
@@ -47,6 +56,8 @@ double at_height(double v)
 // what each square takes, worked out once at load time: rendering only has
 // to read an array.
 static double *bright;
+// and what the failing tubes give, kept apart: they have a life of their own
+static double *faulty;
 
 static int sees(int x1, int y1, int x2, int y2)
 {
@@ -67,8 +78,10 @@ static int sees(int x1, int y1, int x2, int y2)
 void light_map(void)
 {
 	free(bright);
+	free(faulty);
 	bright = calloc((size_t)map_width * map_height, sizeof(*bright));
-	if (!bright)
+	faulty = calloc((size_t)map_width * map_height, sizeof(*faulty));
+	if (!bright || !faulty)
 		return;
 	// the base light of the ceiling strips, everywhere at once
 	for (int i = 0; i < map_width * map_height; i++)
@@ -85,8 +98,12 @@ void light_map(void)
 					if (d > LAMP_ON_WALL || !sees(x, y, i, j))
 						continue;
 					double part = d / LAMP_ON_WALL;
-					bright[j * map_width + i] += 1.0 / (1.0 + 3.0 * part * part)
+					double received = 1.0 / (1.0 + 3.0 * part * part)
 						* (1.0 - part);
+					if (lamp_faulty(x, y))
+						faulty[j * map_width + i] += received;
+					else
+						bright[j * map_width + i] += received;
 				}
 		}
 }
@@ -96,7 +113,8 @@ double lit_here(int x, int y)
 {
 	if (!bright || x < 0 || y < 0 || x >= map_width || y >= map_height)
 		return 0.0;
-	double v = bright[y * map_width + x] * neon;
+	double v = bright[y * map_width + x] * neon
+		+ faulty[y * map_width + x] * fault;
 	return v > 1.0 ? 1.0 : v;
 }
 
