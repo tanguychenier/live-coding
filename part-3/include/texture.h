@@ -27,7 +27,11 @@ struct plate {
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
 
-extern unsigned int wall_texture[TEX_SIZE * TEX_SIZE];
+// several kinds of wall, so one room is not the next: a panel size and four
+// colours, still drawn in code
+#define WALL_KINDS 3
+
+extern unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 extern unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
 extern unsigned int ceiling_texture[TEX_SIZE * TEX_SIZE];
 
@@ -35,7 +39,7 @@ double noise(int x, int y);
 // two colours blended: part = 0 gives the first, 1 gives the second
 unsigned int mix(unsigned int a, unsigned int b, double part);
 unsigned int shade(unsigned int color, double light);
-void make_wall_texture(void);
+void make_wall_textures(void);
 void make_floor_texture(void);
 void make_ceiling_texture(void);
 

@@ -29,7 +29,7 @@ int main(void)
 		return 1;
 
 	// the textures cost nothing to keep and everything to draw: once, here
-	make_wall_texture();
+	make_wall_textures();
 	make_floor_texture();
 	make_ceiling_texture();
 

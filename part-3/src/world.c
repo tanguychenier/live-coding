@@ -1,4 +1,5 @@
 #include "world.h"
+#include "texture.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -91,6 +92,19 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 			}
 		}
 	face_the_open(*start_x, *start_y, dir_x, dir_y);
+}
+
+// the level file says which wall it is: '1' is the first, '2' the second and
+// so on. anything else is the first, so an old level still reads.
+int wall_kind(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	char c = map[y][x];
+	if (c >= '1' && c < '1' + WALL_KINDS)
+		return c - '1';
+	return 0;
 }
 
 int is_wall(int x, int y)

@@ -2,7 +2,7 @@
 
 #include "render.h"
 
-unsigned int wall_texture[TEX_SIZE * TEX_SIZE];
+unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
 unsigned int ceiling_texture[TEX_SIZE * TEX_SIZE];
 
@@ -117,6 +117,14 @@ static const struct plate HULL = {
 	.color = 0x424b59, .light = 0x9aa9bb, .dark = 0x141821,
 	.seam = 0x0d1016, .across = 2, .down = 2, .rivets = 1,
 };
+static const struct plate BULK = {
+	.color = 0x474c54, .light = 0x8b939d, .dark = 0x12151a,
+	.seam = 0x0c0e12, .across = 4, .down = 6, .rivets = 0,
+};
+static const struct plate PARTITION = {
+	.color = 0x39404c, .light = 0x828d9c, .dark = 0x101319,
+	.seam = 0x0a0d12, .across = 2, .down = 4, .rivets = 1,
+};
 static const struct plate DECK = {
 	.color = 0x2f3540, .light = 0x6d7b8c, .dark = 0x0f1218,
 	.seam = 0x090b10, .across = 4, .down = 4, .rivets = 0,
@@ -127,9 +135,11 @@ static const struct plate ROOF = {
 };
 
 // the ordinary wall of the gangway
-void make_wall_texture(void)
+void make_wall_textures(void)
 {
-	make_plating(wall_texture, &HULL);
+	make_plating(wall_texture[0], &BULK);
+	make_plating(wall_texture[1], &HULL);
+	make_plating(wall_texture[2], &PARTITION);
 }
 
 // the floor: dark tiles, tight, no rivets

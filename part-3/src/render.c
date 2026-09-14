@@ -14,7 +14,7 @@ double fog(double distance)
 
 // one column of the wall, read down one column of the texture
 static void draw_wall_column(int x, int top, int height, int tex_x,
-	double light, int dark)
+	double light, int dark, int kind)
 {
 	double step = (double)TEX_SIZE / height;
 	double tex_y = 0.0;
@@ -33,7 +33,7 @@ static void draw_wall_column(int x, int top, int height, int tex_x,
 		bottom = VIEW_HEIGHT;
 
 	for (; y < bottom; y++) {
-		unsigned int color = wall_texture[((int)tex_y & TEX_MASK) * TEX_SIZE + tex_x];
+		unsigned int color = wall_texture[kind][((int)tex_y & TEX_MASK) * TEX_SIZE + tex_x];
 		view[y * VIEW_WIDTH + x] = shade(color, dark ? light * SIDE_LIGHT : light);
 		tex_y += step;
 	}
@@ -91,6 +91,8 @@ struct hit {
 	double distance;
 	double wall_x;
 	int side;
+	// which of the walls it is: the level file says so, by a digit
+	int kind;
 };
 
 // walk the grid square by square until we meet a wall, always stepping along
@@ -137,7 +139,8 @@ static struct hit cast_ray(const struct player *player, double ray_x, double ray
 		: player->x + distance * ray_x;
 	wall_x -= floor(wall_x);
 
-	struct hit hit = { .distance = distance, .wall_x = wall_x, .side = side };
+	struct hit hit = { .distance = distance, .wall_x = wall_x, .side = side,
+			   .kind = wall_kind(map_x, map_y) };
 	return hit;
 }
 
@@ -164,7 +167,7 @@ void render_walls(const struct player *player)
 		// the two orientations must not share a shade, or every corner
 		// disappears
 		draw_wall_column(x, top, height, tex_x, fog(hit.distance),
-			hit.side == 1);
+			hit.side == 1, hit.kind);
 	}
 }
 
