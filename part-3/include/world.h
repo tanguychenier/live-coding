@@ -23,6 +23,10 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 int is_wall(int x, int y);
 int wall_kind(int x, int y);
 int is_lamp(int x, int y);
+// where the studio name is painted on the airlock floor
+#define STENCIL_X 8
+#define STENCIL_Y 3
+int stencil_at(int x, int y);
 // how far the player remembers what has been seen
 #define SEEN_REACH 4
 

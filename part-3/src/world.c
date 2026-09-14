@@ -167,6 +167,17 @@ void remember(const struct player *player)
 		}
 }
 
+// the studio name, painted on the airlock floor. gives back which of the
+// four squares we are looking at, or -1 if it is none of them.
+int stencil_at(int x, int y)
+{
+	// the squares follow one another across the walk: that is how the letters
+	// line up left to right for anyone heading east
+	if (x != STENCIL_X || y < STENCIL_Y || y >= STENCIL_Y + STENCIL_CELLS)
+		return -1;
+	return y - STENCIL_Y;
+}
+
 int is_door(int x, int y)
 {
 	if (x < 0 || y < 0 || x >= map_width || y >= map_height

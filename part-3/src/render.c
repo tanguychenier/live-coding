@@ -81,7 +81,10 @@ void render_floor_and_ceiling(const struct player *player)
 			double light = base + lit_at(ground_x, ground_y);
 			if (light > 1.0)
 				light = 1.0;
-			view[y * view_width + x] = tint(floor_texture[at], light, GLOOM);
+			int painted = stencil_at((int)ground_x, (int)ground_y);
+			unsigned int ground = painted >= 0
+				? stencil_tile(tex_x, tex_y, painted) : floor_texture[at];
+			view[y * view_width + x] = tint(ground, light, GLOOM);
 			view[(view_height - 1 - y) * view_width + x] =
 				tint(ceiling_texture[at], light * CEILING_PART, GLOOM);
 

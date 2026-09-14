@@ -57,6 +57,8 @@ struct plate {
 
 // the same colour, taken under this much neon and this much gloom
 unsigned int tint(unsigned int color, double lamp, double night);
+// the painted tile: `cell` says which of the four we are looking at
+unsigned int stencil_tile(int x, int y, int cell);
 
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
@@ -70,6 +72,15 @@ unsigned int tint(unsigned int color, double lamp, double night);
 #define LAMP_TEXTURE 4         // the ordinary strip, teal
 #define ALARM_TEXTURE 5        // the emergency one, amber
 #define COLD_TEXTURE 6         // and the cold white of the machines
+
+// the name stencilled on the airlock floor: four squares, three letters
+// each, every letter turned a quarter turn to read the way one walks
+#define STENCIL       "TANSOFTWARE"
+#define STENCIL_CELLS 4
+#define STENCIL_EACH  3        // how many letters to a square
+#define STENCIL_PAD   10       // the margin around a letter, in pixels
+#define STENCIL_PAINT 0xb9c6cf
+#define STENCIL_WEAR  0.72     // the paint is worn, not fresh
 
 extern unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 extern unsigned int floor_texture[TEX_SIZE * TEX_SIZE];

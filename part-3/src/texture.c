@@ -1,6 +1,7 @@
 #include "texture.h"
 
 #include "render.h"
+#include "text.h"
 
 unsigned int wall_texture[WALL_KINDS][TEX_SIZE * TEX_SIZE];
 unsigned int floor_texture[TEX_SIZE * TEX_SIZE];
@@ -247,6 +248,25 @@ void make_wall_textures(void)
 }
 
 // the floor: dark tiles, tight, no rivets
+unsigned int stencil_tile(int x, int y, int cell)
+{
+	unsigned int ground = floor_texture[y * TEX_SIZE + x];
+	int part = TEX_SIZE / STENCIL_EACH;
+	int letter = cell * STENCIL_EACH + y / part;
+	if (letter >= (int)sizeof(STENCIL) - 1)
+		return ground;
+
+	// a quarter turn: the width of the letter follows the width of the
+	// corridor, its height follows the way one walks
+	int column = (y % part - STENCIL_PAD) * GLYPH_W / (part - 2 * STENCIL_PAD);
+	int line = (TEX_SIZE - 1 - x - STENCIL_PAD) * GLYPH_H
+		/ (TEX_SIZE - 2 * STENCIL_PAD);
+	if (!glyph_bit(STENCIL[letter], column, line))
+		return ground;
+	return mix(ground, STENCIL_PAINT,
+		STENCIL_WEAR * (0.55 + 0.45 * smooth_noise(x, y, 4)));
+}
+
 void make_floor_texture(void)
 {
 	make_plating(floor_texture, &DECK);
