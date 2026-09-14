@@ -173,6 +173,12 @@ void screen_read_keys(struct screen *screen, struct keys *keys)
 			case XK_Right:  keys->right = down; break;
 			case XK_a:      keys->strafe_left = down; break;
 			case XK_d:      keys->strafe_right = down; break;
+			case XK_space:
+				// a short press must not be lost: press and
+				// release can fall in the same frame
+				if (down)
+					keys->push = 1;
+				break;
 			case XK_F11:
 				if (down)
 					screen_toggle_fullscreen(screen);

@@ -53,6 +53,12 @@ int main(void)
 
 		screen_read_keys(&screen, &keys);
 
+		if (keys.push) {
+			push_door(&player);
+			keys.push = 0;
+		}
+		move_doors(elapsed);
+
 		// the way out. the level had no end: one walked until one
 		// stopped. standing on it closes the keep behind us.
 		if ((int)player.x == exit_x && (int)player.y == exit_y)

@@ -36,6 +36,7 @@ struct screen {
 
 struct keys {
 	int forward, back, left, right, strafe_left, strafe_right, quit;
+	int push;        // a press on space, waiting to be read
 };
 
 // the frame buffer belongs to the screen; everyone else just writes in it

@@ -135,11 +135,44 @@ static const struct plate ROOF = {
 };
 
 // the ordinary wall of the gangway
+// the door opens in two, and the drawing says so before it ever moves
+static void make_door(unsigned int *out)
+{
+	static const struct plate LEAF = {
+		.color = DOOR_STEEL, .light = DOOR_LIGHT, .dark = DOOR_DARK,
+		.seam = DOOR_SEAM, .across = 2, .down = 3, .rivets = 1,
+	};
+	make_plating(out, &LEAF);
+
+	int middle = TEX_SIZE / 2, band = TEX_SIZE / 2 - DOOR_BAND / 2;
+	for (int y = 0; y < TEX_SIZE; y++) {
+		for (int x = 0; x < TEX_SIZE; x++) {
+			// the hazard band: diagonals, and they turn the
+			// other way at the middle, so the leaves read apart
+			if (y >= band && y < band + DOOR_BAND) {
+				int slant = x < middle ? x + y : x - y + TEX_SIZE;
+				unsigned int c = (slant / DOOR_STRIPE) % 2
+					? HAZARD : HAZARD_DARK;
+				double wear = 0.25 * smooth_noise(x, y, 4);
+				out[y * TEX_SIZE + x] = mix(c, DOOR_DARK, wear);
+			}
+			// the centre seam: this is where the two leaves meet
+			int from_middle = x - middle < 0 ? middle - x : x - middle;
+			if (from_middle < 2)
+				out[y * TEX_SIZE + x] = DOOR_SEAM;
+			else if (from_middle < 4)
+				out[y * TEX_SIZE + x] = mix(out[y * TEX_SIZE + x],
+					DOOR_DARK, 0.55);
+		}
+	}
+}
+
 void make_wall_textures(void)
 {
 	make_plating(wall_texture[0], &BULK);
 	make_plating(wall_texture[1], &HULL);
 	make_plating(wall_texture[2], &PARTITION);
+	make_door(wall_texture[3]);
 }
 
 // the floor: dark tiles, tight, no rivets

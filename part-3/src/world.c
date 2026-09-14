@@ -11,6 +11,10 @@
 char **map;
 int map_width, map_height;
 
+// how far each door has opened, one number per square: a door is a place,
+// not an object
+static double *doors;
+
 // what the level file can hold. a wall is anything that is not floor.
 int load_level(const char *path)
 {
@@ -49,6 +53,12 @@ int load_level(const char *path)
 		map_height++;
 	}
 	fclose(f);
+	if (map_height > 0) {
+		free(doors);
+		doors = calloc((size_t)map_width * map_height, sizeof(*doors));
+		if (!doors)
+			return 0;
+	}
 	return map_height > 0;
 }
 
@@ -94,6 +104,53 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 	face_the_open(*start_x, *start_y, dir_x, dir_y);
 }
 
+// we look a few steps ahead, not at arm's length: nobody walks into a door
+// to open it, one pushes it from where one stands
+void push_door(const struct player *player)
+{
+	for (double d = 0.6; d <= DOOR_REACH; d += 0.4) {
+		int x = (int)(player->x + player->dir_x * d);
+		int y = (int)(player->y + player->dir_y * d);
+		if (is_door(x, y)) {
+			if (doors[y * map_width + x] == 0.0)
+				doors[y * map_width + x] = 0.001;
+			return;
+		}
+		if (is_wall(x, y))
+			return;              // a wall between us: nothing to push
+	}
+}
+
+// the two leaves take a second to part, and they never close again: coming
+// back this way should be a short cut, not a chore
+void move_doors(double elapsed)
+{
+	if (!doors)
+		return;
+	for (int i = 0; i < map_width * map_height; i++)
+		if (doors[i] > 0.0 && doors[i] < 1.0) {
+			doors[i] += elapsed / DOOR_SECONDS;
+			if (doors[i] > 1.0)
+				doors[i] = 1.0;
+		}
+}
+
+int is_door(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	return map[y][x] == '+';
+}
+
+double door_at(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || !doors)
+		return 0.0;
+	return doors[y * map_width + x];
+}
+
 // the level file says which wall it is: '1' is the first, '2' the second and
 // so on. anything else is the first, so an old level still reads.
 int wall_kind(int x, int y)
@@ -115,6 +172,8 @@ int is_wall(int x, int y)
 	// the file carries more than walls and floor: where the player
 	// starts, and where the way out is. only a wall stops anyone.
 	char c = map[y][x];
+	if (c == '+')
+		return door_at(x, y) < DOOR_WALKABLE;
 	return !(c == '.' || c == 'S' || c == 'E');
 }
 

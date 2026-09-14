@@ -85,6 +85,38 @@ void render_floor_and_ceiling(const struct player *player)
 	}
 }
 
+// the door opens in two, and in the middle of its square: the ray passes
+// between the leaves, and that is how one sees it open instead of vanish
+static int door_leaf(const struct player *player, double ray_x, double ray_y,
+	int mx, int my, double *distance, double *along)
+{
+	// which way does the wall that holds the door run? that is what says
+	// which plane the threshold lies in
+	int north_south = is_wall(mx, my - 1) && is_wall(mx, my + 1);
+	double toward = north_south ? ray_x : ray_y;
+	if (toward == 0.0)
+		return 0;                     // the ray runs along the threshold
+
+	double d = north_south ? (mx + 0.5 - player->x) / ray_x
+			    : (my + 0.5 - player->y) / ray_y;
+	if (d <= 0.0)
+		return 0;
+	double u = north_south ? player->y + d * ray_y - my
+			    : player->x + d * ray_x - mx;
+	if (u < 0.0 || u > 1.0)
+		return 0;                     // it passes beside the threshold
+
+	double gap = u - 0.5;
+	double half_open = door_at(mx, my) / 2.0;
+	if (gap < half_open && -gap < half_open)
+		return 0;                     // it passes between the two leaves
+
+	*distance = d;
+	// the leaf has slid: the texture slides with it
+	*along = gap < 0.0 ? u + half_open : u - half_open;
+	return 1;
+}
+
 // what a ray found: how far it went, which way the wall it met faces, and
 // where along that wall it landed
 struct hit {
@@ -114,7 +146,7 @@ static struct hit cast_ray(const struct player *player, double ray_x, double ray
 	// always step along the axis whose grid line is nearest. that is
 	// the whole trick: no square is missed, and none is visited twice
 	int side = 0;
-	while (!is_wall(map_x, map_y)) {
+	while (1) {
 		if (side_x < side_y) {
 			side_x += delta_x;
 			map_x += step_x;
@@ -124,6 +156,24 @@ static struct hit cast_ray(const struct player *player, double ray_x, double ray
 			map_y += step_y;
 			side = 1;
 		}
+
+		// a door does not stop a whole square: we ask the
+		// leaf itself, and the ray carries on if it is open
+		if (is_door(map_x, map_y)) {
+			double d, along;
+			if (!door_leaf(player, ray_x, ray_y, map_x, map_y,
+				       &d, &along))
+				continue;
+			int right = is_wall(map_x, map_y - 1)
+				&& is_wall(map_x, map_y + 1);
+			struct hit door = {
+				.distance = d < NEAR_CLIP ? NEAR_CLIP : d,
+				.wall_x = along, .side = right ? 0 : 1,
+				.kind = DOOR_TEXTURE };
+			return door;
+		}
+		if (is_wall(map_x, map_y))
+			break;
 	}
 
 	// how far it went, measured on the camera plane and not from the eye:

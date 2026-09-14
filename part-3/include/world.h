@@ -22,6 +22,19 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 		 double *dir_x, double *dir_y);
 int is_wall(int x, int y);
 int wall_kind(int x, int y);
+// a door takes a second to open, and once it is open this far one walks
+// between the two leaves
+#define DOOR_SECONDS  1.2
+#define DOOR_WALKABLE 0.8
+// how far a push reaches: one opens a door from where one stands, not with
+// one's nose against the leaf
+#define DOOR_REACH    2.6
+
+int is_door(int x, int y);
+// from 0 (shut) to 1 (both leaves tucked into the wall)
+double door_at(int x, int y);
+void push_door(const struct player *player);
+void move_doors(double elapsed);
 void move_player(struct player *player, double step_x, double step_y);
 void turn_player(struct player *player, double angle);
 
