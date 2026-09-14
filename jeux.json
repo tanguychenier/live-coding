@@ -3,15 +3,14 @@
     "dossier": "wolfenstein-like",
     "resume": "The Keep, a first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is ours.",
     "court": "One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.",
-    "partie": 2,
+    "partie": 3,
     "total": 4,
-    "video": "SeKs2vCeFUk",
+    "video": "YKUUJJBlzc4",
     "techno": "c",
-    "lignes": 795,
-    "duree": "1 h 42",
+    "lignes": 1907,
+    "duree": "3 h 43",
     "capture": "jeu-1.png",
-    "chemin_capture": "part-2/captures/jeu-1.png",
-    "titre": "The Keep"
+    "chemin_capture": "part-3/captures/jeu-1.png"
   },
   {
     "dossier": "street-fighter-like",

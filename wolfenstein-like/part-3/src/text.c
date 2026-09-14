@@ -1,0 +1,90 @@
+#include "text.h"
+
+#include "screen.h"
+
+// five columns by seven rows, one byte per column, lowest bit at the top:
+// twenty-six letters and ten digits, and nothing more
+static const unsigned char font[36][GLYPH_W] = {
+	{0x7e,0x11,0x11,0x11,0x7e}, {0x7f,0x49,0x49,0x49,0x36}, {0x3e,0x41,0x41,0x41,0x22}, {0x7f,0x41,0x41,0x41,0x3e},   // A B C D
+	{0x7f,0x49,0x49,0x49,0x41}, {0x7f,0x09,0x09,0x09,0x01}, {0x3e,0x41,0x49,0x49,0x7a}, {0x7f,0x08,0x08,0x08,0x7f},   // E F G H
+	{0x00,0x41,0x7f,0x41,0x00}, {0x20,0x40,0x41,0x3f,0x01}, {0x7f,0x08,0x14,0x22,0x41}, {0x7f,0x40,0x40,0x40,0x40},   // I J K L
+	{0x7f,0x02,0x0c,0x02,0x7f}, {0x7f,0x04,0x08,0x10,0x7f}, {0x3e,0x41,0x41,0x41,0x3e}, {0x7f,0x09,0x09,0x09,0x06},   // M N O P
+	{0x3e,0x41,0x51,0x21,0x5e}, {0x7f,0x09,0x19,0x29,0x46}, {0x46,0x49,0x49,0x49,0x31}, {0x01,0x01,0x7f,0x01,0x01},   // Q R S T
+	{0x3f,0x40,0x40,0x40,0x3f}, {0x1f,0x20,0x40,0x20,0x1f}, {0x7f,0x20,0x18,0x20,0x7f}, {0x63,0x14,0x08,0x14,0x63},   // U V W X
+	{0x07,0x08,0x70,0x08,0x07}, {0x61,0x51,0x49,0x45,0x43}, {0x3e,0x51,0x49,0x45,0x3e}, {0x00,0x42,0x7f,0x40,0x00},   // Y Z 0 1
+	{0x42,0x61,0x51,0x49,0x46}, {0x21,0x41,0x45,0x4b,0x31}, {0x18,0x14,0x12,0x7f,0x10}, {0x27,0x45,0x45,0x45,0x39},   // 2 3 4 5
+	{0x3c,0x4a,0x49,0x49,0x30}, {0x01,0x71,0x09,0x05,0x03}, {0x36,0x49,0x49,0x49,0x36}, {0x06,0x49,0x49,0x29,0x1e},   // 6 7 8 9
+};
+
+// where to find a letter in the table. anything that is not in it, spaces
+// included, moves on one step without drawing.
+static int glyph_of(char c)
+{
+	if (c >= 'a' && c <= 'z')
+		c -= 'a' - 'A';
+	if (c >= 'A' && c <= 'Z')
+		return c - 'A';
+	if (c >= '0' && c <= '9')
+		return c - '0' + 26;
+	return -1;
+}
+
+// is this letter lit at that spot? the floor uses it too: the stencilled
+// name comes out of the same font as the text on screen.
+int glyph_bit(char c, int column, int line)
+{
+	int index = glyph_of(c);
+	if (index < 0 || column < 0 || column >= GLYPH_W
+	    || line < 0 || line >= GLYPH_H)
+		return 0;
+	return (font[index][column] >> line) & 1;
+}
+
+// one font pixel, `size` view pixels wide
+static void block(int x, int y, int size, unsigned int color)
+{
+	for (int j = 0; j < size; j++)
+		for (int i = 0; i < size; i++) {
+			int px = x + i, py = y + j;
+			if (px >= 0 && px < view_width && py >= 0 && py < view_height)
+				view[py * view_width + px] = color;
+		}
+}
+
+int draw_text(int x, int y, const char *text, unsigned int color, int scale)
+{
+	int width = 0;
+	for (const char *p = text; *p; p++, width += GLYPH_W + 1) {
+		int index = glyph_of(*p);
+		if (index < 0)
+			continue;
+		for (int column = 0; column < GLYPH_W; column++) {
+			unsigned char bits = font[index][column];
+			for (int line = 0; line < GLYPH_H; line++) {
+				if (!(bits & (1 << line)))
+					continue;
+				int px = x + (width + column) * scale;
+				int py = y + line * scale;
+				// a one pixel shadow: without it the text
+				// vanishes as soon as it crosses a light plate.
+				block(px + scale, py + scale, scale, TEXT_SHADOW);
+				block(px, py, scale, color);
+			}
+		}
+	}
+	return width * scale;
+}
+
+// the same, centred on the width of the view
+void draw_text_centered(int y, const char *text, unsigned int color, int scale)
+{
+	int width = 0;
+	for (const char *p = text; *p; p++)
+		width += GLYPH_W + 1;
+	draw_text((view_width - width * scale) / 2, y, text, color, scale);
+}
+
+// the world comes out of a file now: doors, a torch, a way out
+// next time it becomes a game: something in the dark that fires back
+// the source goes on github right after the stream, one commit per step
+// thanks for watching

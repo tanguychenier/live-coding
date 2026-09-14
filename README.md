@@ -14,13 +14,13 @@ code, no cuts, no second take. The commit lands when the stream ends.
 <tr>
 <td width="50%" valign="top">
 
-<a href="wolfenstein-like"><img src="wolfenstein-like/part-2/captures/jeu-1.png" width="100%" alt="wolfenstein-like"></a>
+<a href="wolfenstein-like"><img src="wolfenstein-like/part-3/captures/jeu-1.png" width="100%" alt="wolfenstein-like"></a>
 
-### [The Keep](wolfenstein-like)
+### [wolfenstein-like](wolfenstein-like)
 
 One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.
 
-<sub>C and X11 · 795 lines · written live in 1 h 42 · <a href="https://youtu.be/SeKs2vCeFUk">watch it</a></sub>
+<sub>C and X11 · 1907 lines · written live in 3 h 43 · <a href="https://youtu.be/YKUUJJBlzc4">watch it</a></sub>
 
 </td>
 <td width="50%" valign="top">

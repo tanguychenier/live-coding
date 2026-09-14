@@ -1,0 +1,337 @@
+#include "world.h"
+#include "texture.h"
+#include "screen.h"
+#include "render.h"
+
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// the world comes out of a file: a table compiled in means rebuilding the
+// game to move one corridor
+char **map;
+int map_width, map_height;
+
+// how far each door has opened, one number per square: a door is a place,
+// not an object
+static double *doors;
+
+// what we have seen. a map that shows the whole level from the first second
+// leaves nothing to find; this one fills in as one goes.
+static char *seen;
+
+// what the level file can hold. a wall is anything that is not floor.
+int load_level(const char *path)
+{
+	FILE *f = fopen(path, "r");
+	if (!f) {
+		fprintf(stderr, "no level at %s\n", path);
+		return 0;
+	}
+
+	char line[512];
+	int room = 0;
+	map_height = 0;
+	map_width = 0;
+	while (fgets(line, sizeof line, f)) {
+		int length = (int)strlen(line);
+		while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r'))
+			line[--length] = '\0';
+		if (length == 0)
+			continue;
+		if (map_height == room) {
+			room = room ? room * 2 : 32;
+			char **bigger = realloc(map, (size_t)room * sizeof(*map));
+			if (!bigger) {
+				fclose(f);
+				return 0;
+			}
+			map = bigger;
+		}
+		map[map_height] = strdup(line);
+		if (!map[map_height]) {
+			fclose(f);
+			return 0;
+		}
+		if (length > map_width)
+			map_width = length;
+		map_height++;
+	}
+	fclose(f);
+	if (map_height > 0) {
+		free(doors);
+		doors = calloc((size_t)map_width * map_height, sizeof(*doors));
+		free(seen);
+		seen = calloc((size_t)map_width * map_height, 1);
+		if (!doors || !seen)
+			return 0;
+	}
+	return map_height > 0;
+}
+
+// which way to look when the game opens: down the longest clear line, so the
+// first thing anyone sees is a corridor and not a wall two steps away
+static void face_the_open(double x, double y, double *dir_x, double *dir_y)
+{
+	const double way[4][2] = { {1, 0}, {0, 1}, {-1, 0}, {0, -1} };
+	double best = -1.0;
+	*dir_x = 1.0;
+	*dir_y = 0.0;
+	for (int i = 0; i < 4; i++) {
+		double d = 0.0;
+		while (d < 20.0 && !is_wall((int)(x + way[i][0] * (d + 0.5)),
+					    (int)(y + way[i][1] * (d + 0.5))))
+			d += 0.5;
+		if (d > best) {
+			best = d;
+			*dir_x = way[i][0];
+			*dir_y = way[i][1];
+		}
+	}
+}
+
+// 'S' is where we stand at the first frame, 'E' is the way out
+void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
+		 double *dir_x, double *dir_y)
+{
+	*start_x = 1.5;
+	*start_y = 1.5;
+	*exit_x = -1;
+	*exit_y = -1;
+	for (int y = 0; y < map_height; y++)
+		for (int x = 0; map[y][x]; x++) {
+			if (map[y][x] == 'S') {
+				*start_x = x + 0.5;
+				*start_y = y + 0.5;
+			} else if (map[y][x] == 'E') {
+				*exit_x = x;
+				*exit_y = y;
+			}
+		}
+	face_the_open(*start_x, *start_y, dir_x, dir_y);
+}
+
+// the door in front of us, if there is a shut one within reach. a few steps
+// ahead, not at arm's length: one pushes a door from where one stands.
+static int door_in_front(const struct player *player, int *door_x, int *door_y)
+{
+	for (double d = 0.6; d <= DOOR_REACH; d += 0.4) {
+		int x = (int)(player->x + player->dir_x * d);
+		int y = (int)(player->y + player->dir_y * d);
+		if (is_door(x, y)) {
+			*door_x = x;
+			*door_y = y;
+			return door_at(x, y) == 0.0;
+		}
+		if (is_wall(x, y))
+			return 0;             // a wall between us: nothing to push
+	}
+	return 0;
+}
+
+// a game never asks for a key without saying so: the line shown on screen
+// comes out of this function.
+int door_ahead(const struct player *player)
+{
+	int x, y;
+	return door_in_front(player, &x, &y);
+}
+
+// we nudge it once: after that the two leaves finish their travel
+void push_door(const struct player *player)
+{
+	int x, y;
+	if (door_in_front(player, &x, &y))
+		doors[y * map_width + x] = 0.001;
+}
+
+// the two leaves take a second to part, and they never close again: coming
+// back this way should be a short cut, not a chore
+void move_doors(double elapsed)
+{
+	if (!doors)
+		return;
+	for (int i = 0; i < map_width * map_height; i++)
+		if (doors[i] > 0.0 && doors[i] < 1.0) {
+			doors[i] += elapsed / DOOR_SECONDS;
+			if (doors[i] > 1.0)
+				doors[i] = 1.0;
+		}
+}
+
+int is_seen(int x, int y)
+{
+	if (!seen || x < 0 || y < 0 || x >= map_width || y >= map_height)
+		return 0;
+	return seen[y * map_width + x];
+}
+
+// everything a few steps away, and nothing behind a wall: we mark what the
+// light really reaches
+void remember(const struct player *player)
+{
+	if (!seen)
+		return;
+	int cx = (int)player->x, cy = (int)player->y;
+	for (int y = cy - SEEN_REACH; y <= cy + SEEN_REACH; y++)
+		for (int x = cx - SEEN_REACH; x <= cx + SEEN_REACH; x++) {
+			if (x < 0 || y < 0 || x >= map_width || y >= map_height)
+				continue;
+			if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > SEEN_REACH * SEEN_REACH)
+				continue;
+			seen[y * map_width + x] = 1;
+		}
+}
+
+// the studio name, painted on the airlock floor. gives back which of the
+// four squares we are looking at, or -1 if it is none of them.
+// the badge. a way out and nothing else to look for is a corridor, not a
+// level: the hatch is locked, and what opens it is down in the hold.
+static int badge_taken;
+
+int have_badge(void)
+{
+	return badge_taken;
+}
+
+// gives 1 on the frame the badge is picked up, so it can be said
+int walk_over(const struct player *player)
+{
+	if (!is_badge((int)player->x, (int)player->y))
+		return 0;
+	badge_taken = 1;
+	return 1;
+}
+
+int stencil_at(int x, int y)
+{
+	// the squares follow one another across the walk: that is how the letters
+	// line up left to right for anyone heading east
+	if (x != STENCIL_X || y < STENCIL_Y || y >= STENCIL_Y + STENCIL_CELLS)
+		return -1;
+	return y - STENCIL_Y;
+}
+
+int is_door(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	return map[y][x] == '+';
+}
+
+// a strip sits on a wall: the file puts a letter where the wall would be,
+// and that letter carries the neon
+int is_lamp(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	char c = map[y][x];
+	return c == 'T' || c == 'R' || c == 'B' || c == 'F';
+}
+
+// we pick it up by walking over it: a chest would be a block that eats
+// the screen, a plate on the floor is seen from far off
+int is_badge(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	char c = map[y][x];
+	return c == 'K' && !badge_taken;
+}
+
+// a tube at the end of its life. "F" for failing: it holds, it drops, it
+// comes back. this is not a ripple, it is a wobble that no longer passes.
+int lamp_faulty(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	return map[y][x] == 'F';
+}
+
+double door_at(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || !doors)
+		return 0.0;
+	return doors[y * map_width + x];
+}
+
+// the level file says which wall it is: '1' is the first, '2' the second and
+// so on. anything else is the first, so an old level still reads.
+int wall_kind(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 0;
+	char c = map[y][x];
+	if (c == 'T' || c == 'F')
+		return LAMP_TEXTURE;
+	if (c == 'R')
+		return ALARM_TEXTURE;
+	if (c == 'B')
+		return COLD_TEXTURE;
+	if (c >= '1' && c < '1' + WALL_KINDS)
+		return c - '1';
+	return 0;
+}
+
+int is_wall(int x, int y)
+{
+	if (x < 0 || x >= map_width || y < 0 || y >= map_height
+	    || x >= (int)strlen(map[y]))
+		return 1;
+	// the file carries more than walls and floor: where the player
+	// starts, and where the way out is. only a wall stops anyone.
+	char c = map[y][x];
+	if (c == '+')
+		return door_at(x, y) < DOOR_WALKABLE;
+	return !(c == '.' || c == 'S' || c == 'E' || c == 'K');
+}
+
+// the camera plane follows the shape of the window. its length is the field
+// of view: keeping it fixed as the window widens stretches the picture.
+void fit_view_to_window(struct player *player)
+{
+	double aspect = (double)view_width / view_height;
+	double length = FIELD_OF_VIEW * aspect / (16.0 / 10.0);
+	double n = hypot(player->plane_x, player->plane_y);
+	if (n <= 0.0)
+		return;
+	player->plane_x = player->plane_x / n * length;
+	player->plane_y = player->plane_y / n * length;
+}
+
+// each axis is tested on its own, so a shoulder against a wall keeps sliding
+// instead of stopping the player dead. the margin is the nose: without it we
+// walk until the eyes are inside the texture
+void move_player(struct player *player, double step_x, double step_y)
+{
+	const double margin = 0.2;
+	double nose_x = step_x > 0 ? margin : -margin;
+	double nose_y = step_y > 0 ? margin : -margin;
+
+	if (!is_wall((int)(player->x + step_x + nose_x), (int)player->y))
+		player->x += step_x;
+	if (!is_wall((int)player->x, (int)(player->y + step_y + nose_y)))
+		player->y += step_y;
+}
+
+// turning is one rotation matrix, applied to both vectors at once
+void turn_player(struct player *player, double angle)
+{
+	double cosine = cos(angle);
+	double sine = sin(angle);
+
+	double dir_x = player->dir_x;
+	player->dir_x = dir_x * cosine - player->dir_y * sine;
+	player->dir_y = dir_x * sine + player->dir_y * cosine;
+
+	double plane_x = player->plane_x;
+	player->plane_x = plane_x * cosine - player->plane_y * sine;
+	player->plane_y = plane_x * sine + player->plane_y * cosine;
+}
