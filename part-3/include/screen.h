@@ -3,14 +3,23 @@
 
 #include <X11/Xlib.h>
 
-// the world is drawn at 320x200 and blown up to fill the window: chunky
-// pixels are not nostalgia, they are four times fewer rays to trace
-#define VIEW_WIDTH  320
-#define VIEW_HEIGHT 200
-#define SCALE       4
-#define WIN_WIDTH   (VIEW_WIDTH * SCALE)
-#define WIN_HEIGHT  (VIEW_HEIGHT * SCALE)
-#define HORIZON     (VIEW_HEIGHT / 2)
+// one view pixel is a block of PIXEL by PIXEL pixels: two keeps the edges
+// without costing four times as many rays
+#define PIXEL       2
+// the size the window opens at. after that a wider window shows more world,
+// it does not blow up what was already there
+#define WIN_WIDTH   1280
+#define WIN_HEIGHT  800
+// never less than this, whatever the player does to the window
+#define VIEW_MIN_W  160
+#define VIEW_MIN_H  100
+
+// the picture, and its size at this instant. it changes with the window, so
+// it can no longer be an array whose size is known at compile time.
+extern unsigned int *view;
+extern int view_width, view_height;
+
+#define HORIZON     (view_height / 2)
 
 // XCreateImage wants to know how each row of pixels is padded, in bits. this
 // is NOT the colour depth: 32 is what a modern display expects
@@ -40,8 +49,6 @@ struct keys {
 };
 
 // the frame buffer belongs to the screen; everyone else just writes in it
-extern unsigned int view[VIEW_WIDTH * VIEW_HEIGHT];
-
 int screen_open(struct screen *screen);
 int screen_resize(struct screen *screen, int width, int height);
 void screen_toggle_fullscreen(struct screen *screen);

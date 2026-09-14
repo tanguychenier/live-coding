@@ -40,5 +40,6 @@ void push_door(const struct player *player);
 void move_doors(double elapsed);
 void move_player(struct player *player, double step_x, double step_y);
 void turn_player(struct player *player, double angle);
+void fit_view_to_window(struct player *player);
 
 #endif

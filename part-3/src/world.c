@@ -1,5 +1,7 @@
 #include "world.h"
 #include "texture.h"
+#include "screen.h"
+#include "render.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -202,6 +204,19 @@ int is_wall(int x, int y)
 	if (c == '+')
 		return door_at(x, y) < DOOR_WALKABLE;
 	return !(c == '.' || c == 'S' || c == 'E');
+}
+
+// the camera plane follows the shape of the window. its length is the field
+// of view: keeping it fixed as the window widens stretches the picture.
+void fit_view_to_window(struct player *player)
+{
+	double aspect = (double)view_width / view_height;
+	double length = FIELD_OF_VIEW * aspect / (16.0 / 10.0);
+	double n = hypot(player->plane_x, player->plane_y);
+	if (n <= 0.0)
+		return;
+	player->plane_x = player->plane_x / n * length;
+	player->plane_y = player->plane_y / n * length;
 }
 
 // each axis is tested on its own, so a shoulder against a wall keeps sliding

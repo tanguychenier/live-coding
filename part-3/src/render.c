@@ -23,8 +23,8 @@ static void draw_wall_column(int x, int top, int height, int tex_x,
 	}
 
 	int bottom = top + height;
-	if (bottom > VIEW_HEIGHT)
-		bottom = VIEW_HEIGHT;
+	if (bottom > view_height)
+		bottom = view_height;
 
 	for (; y < bottom; y++) {
 		unsigned int color = wall_texture[kind][((int)tex_y & TEX_MASK) * TEX_SIZE + tex_x];
@@ -34,7 +34,7 @@ static void draw_wall_column(int x, int top, int height, int tex_x,
 		lit *= at_height(tex_y / TEX_SIZE);
 		if (lit < 0.0)
 			lit = 0.0;
-		view[y * VIEW_WIDTH + x] = tint(color, lit, GLOOM);
+		view[y * view_width + x] = tint(color, lit, GLOOM);
 		tex_y += step;
 	}
 }
@@ -56,24 +56,24 @@ void render_floor_and_ceiling(const struct player *player)
 	double left_x = player->dir_x - player->plane_x;
 	double left_y = player->dir_y - player->plane_y;
 
-	for (int y = HORIZON + 1; y < VIEW_HEIGHT; y++) {
+	for (int y = HORIZON + 1; y < view_height; y++) {
 		// how far the ground under this row is: a row one pixel below
 		// the horizon is very far, the bottom row is right at our feet,
 		// and the eye is half a wall above the floor
-		double distance = (double)VIEW_HEIGHT / (2 * y - VIEW_HEIGHT);
+		double distance = (double)view_height / (2 * y - view_height);
 
 		// where that row starts on the floor, and what one pixel to the
 		// right is worth. the camera plane spans from -plane to +plane,
 		// so the whole row is two planes wide
-		double step_x = distance * 2.0 * player->plane_x / VIEW_WIDTH;
-		double step_y = distance * 2.0 * player->plane_y / VIEW_WIDTH;
+		double step_x = distance * 2.0 * player->plane_x / view_width;
+		double step_y = distance * 2.0 * player->plane_y / view_width;
 		double ground_x = player->x + distance * left_x;
 		double ground_y = player->y + distance * left_y;
 		// the floor takes what its square takes: that is what
 		// lays the pools of light on the ground
 		double base = CARRIED * lamp(distance);
 
-		for (int x = 0; x < VIEW_WIDTH; x++) {
+		for (int x = 0; x < view_width; x++) {
 			int tex_x = (int)(ground_x * TEX_SIZE) & TEX_MASK;
 			int tex_y = (int)(ground_y * TEX_SIZE) & TEX_MASK;
 			int at = tex_y * TEX_SIZE + tex_x;
@@ -81,8 +81,8 @@ void render_floor_and_ceiling(const struct player *player)
 			double light = base + lit_at(ground_x, ground_y);
 			if (light > 1.0)
 				light = 1.0;
-			view[y * VIEW_WIDTH + x] = tint(floor_texture[at], light, GLOOM);
-			view[(VIEW_HEIGHT - 1 - y) * VIEW_WIDTH + x] =
+			view[y * view_width + x] = tint(floor_texture[at], light, GLOOM);
+			view[(view_height - 1 - y) * view_width + x] =
 				tint(ceiling_texture[at], light * CEILING_PART, GLOOM);
 
 			ground_x += step_x;
@@ -204,14 +204,14 @@ static struct hit cast_ray(const struct player *player, double ray_x, double ray
 // tall the wall is drawn: near is tall, far is short
 void render_walls(const struct player *player)
 {
-	for (int x = 0; x < VIEW_WIDTH; x++) {
+	for (int x = 0; x < view_width; x++) {
 		// -1 on the left edge of the screen, +1 on the right edge
-		double camera = 2.0 * x / VIEW_WIDTH - 1.0;
+		double camera = 2.0 * x / view_width - 1.0;
 		double ray_x = player->dir_x + player->plane_x * camera;
 		double ray_y = player->dir_y + player->plane_y * camera;
 		struct hit hit = cast_ray(player, ray_x, ray_y);
 
-		int height = (int)(VIEW_HEIGHT / hit.distance);
+		int height = (int)(view_height / hit.distance);
 		int top = HORIZON - height / 2;
 
 		int tex_x = (int)(hit.wall_x * TEX_SIZE);
@@ -246,8 +246,8 @@ void render_walls(const struct player *player)
 // map, and until now it wrote wherever that landed in memory
 static void put_pixel(int x, int y, unsigned int color)
 {
-	if (x >= 0 && x < VIEW_WIDTH && y >= 0 && y < VIEW_HEIGHT)
-		view[y * VIEW_WIDTH + x] = color;
+	if (x >= 0 && x < view_width && y >= 0 && y < view_height)
+		view[y * view_width + x] = color;
 }
 
 // the same map, now small enough to live in a corner

@@ -7,7 +7,9 @@
 #include <stdlib.h>
 
 // every pixel of the game lands here first
-unsigned int view[VIEW_WIDTH * VIEW_HEIGHT];
+unsigned int *view;
+int view_width = WIN_WIDTH / PIXEL;
+int view_height = WIN_HEIGHT / PIXEL;
 
 // the window at the size of the picture, in the middle of the screen
 static void screen_windowed(struct screen *screen)
@@ -47,20 +49,26 @@ void screen_toggle_fullscreen(struct screen *screen)
 // window. a whole number of pixels per pixel, or the walls shimmer
 static void screen_fit(struct screen *screen)
 {
-	int by_width = screen->width / VIEW_WIDTH;
-	int by_height = screen->height / VIEW_HEIGHT;
+	// the window decides how many rays we cast, and a view
+	// pixel stays a whole number of screen pixels
+	int vw = screen->width / PIXEL;
+	int vh = screen->height / PIXEL;
+	if (vw < VIEW_MIN_W)
+		vw = VIEW_MIN_W;
+	if (vh < VIEW_MIN_H)
+		vh = VIEW_MIN_H;
+	if (vw != view_width || vh != view_height || !view) {
+		unsigned int *bigger = realloc(view, (size_t)vw * vh * sizeof(*view));
+		if (bigger) {
+			view = bigger;
+			view_width = vw;
+			view_height = vh;
+		}
+	}
 
-	screen->scale = by_width < by_height ? by_width : by_height;
-	if (screen->scale < 1)
-		screen->scale = 1;
-	// a window smaller than the picture would give a negative corner, and we
-	// would copy pixels in front of the buffer
-	screen->left = (screen->width - VIEW_WIDTH * screen->scale) / 2;
-	if (screen->left < 0)
-		screen->left = 0;
-	screen->top = (screen->height - VIEW_HEIGHT * screen->scale) / 2;
-	if (screen->top < 0)
-		screen->top = 0;
+	screen->scale = PIXEL;
+	screen->left = (screen->width - view_width * screen->scale) / 2;
+	screen->top = (screen->height - view_height * screen->scale) / 2;
 }
 
 // a new window size means a new buffer and a new image. XDestroyImage frees
@@ -110,7 +118,7 @@ int screen_open(struct screen *screen)
 	// the window may grow as much as it likes, but never below the picture:
 	// under that there is nothing left to show
 	XSizeHints hints = { .flags = PMinSize,
-		.min_width = VIEW_WIDTH, .min_height = VIEW_HEIGHT };
+		.min_width = view_width, .min_height = view_height };
 	XSetWMNormalHints(screen->display, screen->window, &hints);
 
 	// without this the close button cuts the connection under our feet;
@@ -191,18 +199,21 @@ void screen_read_keys(struct screen *screen, struct keys *keys)
 // blow the 320x200 view up into the window, one source pixel per block
 void screen_present(struct screen *screen)
 {
-	// whatever the picture does not cover stays the window colour
-	for (int i = 0; i < screen->width * screen->height; i++)
-		screen->pixels[i] = WINDOW_BG;
-
+	// we only clear what we do not redraw: clearing it all
+	// first is writing every pixel of every frame twice
 	int scale = screen->scale;
+	int cover_w = view_width * scale, cover_h = view_height * scale;
+	if (screen->left > 0 || screen->top > 0
+	    || cover_w < screen->width || cover_h < screen->height)
+		for (int i = 0; i < screen->width * screen->height; i++)
+			screen->pixels[i] = WINDOW_BG;
 	// a window narrower than the picture: we draw the columns that fit, and
 	// this does not change from one row to the next
 	int visible = (screen->width - screen->left) / scale;
-	if (visible > VIEW_WIDTH)
-		visible = VIEW_WIDTH;
-	for (int y = 0; y < VIEW_HEIGHT; y++) {
-		unsigned int *row = view + y * VIEW_WIDTH;
+	if (visible > view_width)
+		visible = view_width;
+	for (int y = 0; y < view_height; y++) {
+		unsigned int *row = view + y * view_width;
 		for (int copy = 0; copy < scale; copy++) {
 			int line = screen->top + y * scale + copy;
 			if (line >= screen->height)

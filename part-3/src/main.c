@@ -78,6 +78,7 @@ int main(void)
 
 		move_player(&player, step_x, step_y);
 		turn_player(&player, turn);
+		fit_view_to_window(&player);
 		render_floor_and_ceiling(&player);
 		render_walls(&player);
 		render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
