@@ -42,6 +42,16 @@ struct plate {
 #define NEON_EDGE  0x3aa896
 #define HOUSING    0x1a1f28    // the metal housing that holds it
 
+// the colour of light: a plate under a neon and the same plate in shadow
+// differ by colour, not only by how much light they take
+#define LIGHT_LAMP  0xf2fffc   // a white barely turned teal
+// and the shadow is frankly blue: the contrast between the two is what
+// makes the picture, not the difference in brightness
+#define LIGHT_NIGHT 0x2c4a80
+
+// the same colour, taken under this much neon and this much gloom
+unsigned int tint(unsigned int color, double lamp, double night);
+
 // a wall met on a north-south line keeps this much of its light
 #define SIDE_LIGHT   0.68
 

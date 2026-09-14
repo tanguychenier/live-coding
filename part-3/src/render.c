@@ -1,20 +1,14 @@
 #include "render.h"
+#include "light.h"
 
 #include "screen.h"
 #include "texture.h"
 
 #include <math.h>
 
-// far away is dark: light is 1 at the eye and falls towards 0 with the
-// square of the distance. one line, and the corridors have depth
-double fog(double distance)
-{
-	return 1.0 / (1.0 + distance * distance * FOG_DENSITY);
-}
-
 // one column of the wall, read down one column of the texture
 static void draw_wall_column(int x, int top, int height, int tex_x,
-	double light, int dark, int kind)
+	double warm, int dark, int kind)
 {
 	double step = (double)TEX_SIZE / height;
 	double tex_y = 0.0;
@@ -34,7 +28,13 @@ static void draw_wall_column(int x, int top, int height, int tex_x,
 
 	for (; y < bottom; y++) {
 		unsigned int color = wall_texture[kind][((int)tex_y & TEX_MASK) * TEX_SIZE + tex_x];
-		view[y * VIEW_WIDTH + x] = shade(color, dark ? light * SIDE_LIGHT : light);
+		double lit = dark ? warm * SIDE_LIGHT : warm;
+		// and the height: under the vault it is dark, at strip
+		// height it is day. without this the wall is a flat wash.
+		lit *= at_height(tex_y / TEX_SIZE);
+		if (lit < 0.0)
+			lit = 0.0;
+		view[y * VIEW_WIDTH + x] = tint(color, lit, GLOOM);
 		tex_y += step;
 	}
 }
@@ -69,15 +69,21 @@ void render_floor_and_ceiling(const struct player *player)
 		double step_y = distance * 2.0 * player->plane_y / VIEW_WIDTH;
 		double ground_x = player->x + distance * left_x;
 		double ground_y = player->y + distance * left_y;
-		double light = fog(distance);
+		// the floor takes what its square takes: that is what
+		// lays the pools of light on the ground
+		double base = CARRIED * lamp(distance);
 
 		for (int x = 0; x < VIEW_WIDTH; x++) {
 			int tex_x = (int)(ground_x * TEX_SIZE) & TEX_MASK;
 			int tex_y = (int)(ground_y * TEX_SIZE) & TEX_MASK;
 			int at = tex_y * TEX_SIZE + tex_x;
 
-			view[y * VIEW_WIDTH + x] = shade(floor_texture[at], light);
-			view[(VIEW_HEIGHT - 1 - y) * VIEW_WIDTH + x] = shade(ceiling_texture[at], light);
+			double light = base + lit_at(ground_x, ground_y);
+			if (light > 1.0)
+				light = 1.0;
+			view[y * VIEW_WIDTH + x] = tint(floor_texture[at], light, GLOOM);
+			view[(VIEW_HEIGHT - 1 - y) * VIEW_WIDTH + x] =
+				tint(ceiling_texture[at], light * CEILING_PART, GLOOM);
 
 			ground_x += step_x;
 			ground_y += step_y;
@@ -214,9 +220,24 @@ void render_walls(const struct player *player)
 		if ((hit.side == 0 && ray_x > 0) || (hit.side == 1 && ray_y < 0))
 			tex_x = TEX_SIZE - 1 - tex_x;
 
-		// the two orientations must not share a shade, or every corner
-		// disappears
-		draw_wall_column(x, top, height, tex_x, fog(hit.distance),
+		// how square this wall is to us: a north-south wall met by a ray
+		// going mostly east is seen head on, and catches the light
+		double facing = hit.side == 0 ? ray_x : ray_y;
+		double length = sqrt(ray_x * ray_x + ray_y * ray_y);
+		if (length > 0.0)
+			facing /= length;
+		// this wall takes what the square we look at it from
+		// takes, at the point we hit, plus the glow we carry
+		double on_wall = lit_at(player->x + ray_x * hit.distance * 0.94,
+				       player->y + ray_y * hit.distance * 0.94);
+		double lit = on_wall + CARRIED * lamp(hit.distance);
+		if (lit > 1.0)
+			lit = 1.0;
+		// a wall facing us takes the neon, a wall seen at an angle
+		// far less
+		double face = LAMP_AMBIENT + (1.0 - LAMP_AMBIENT)
+			* (facing < 0 ? -facing : facing);
+		draw_wall_column(x, top, height, tex_x, lit * face,
 			hit.side == 1, hit.kind);
 	}
 }

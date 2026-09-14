@@ -47,6 +47,24 @@ unsigned int mix(unsigned int a, unsigned int b, double part)
 	return out;
 }
 
+// each channel of the surface, times what the light gives it there: the
+// neon gives green and blue, the gloom almost only blue
+unsigned int tint(unsigned int color, double lamp, double night)
+{
+	unsigned int out = 0;
+	for (int d = 0; d <= RED_SHIFT; d += GREEN_SHIFT) {
+		// two constants: dividing them by 255 at every pixel
+		// of every frame costs three divisions for nothing
+		double part = lamp * ((LIGHT_LAMP >> d) & CHANNEL)
+			+ night * ((LIGHT_NIGHT >> d) & CHANNEL);
+		double v = ((color >> d) & CHANNEL) * part * (1.0 / CHANNEL);
+		if (v > CHANNEL)
+			v = CHANNEL;
+		out |= (unsigned int)v << d;
+	}
+	return out;
+}
+
 unsigned int shade(unsigned int color, double light)
 {
 	if (light > 1.0)

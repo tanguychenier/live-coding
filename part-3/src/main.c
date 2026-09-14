@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "render.h"
+#include "light.h"
 #include "screen.h"
 #include "texture.h"
 #include "world.h"
@@ -30,6 +31,7 @@ int main(void)
 
 	// the textures cost nothing to keep and everything to draw: once, here
 	make_wall_textures();
+	light_map();
 	make_floor_texture();
 	make_ceiling_texture();
 
@@ -58,6 +60,7 @@ int main(void)
 			keys.push = 0;
 		}
 		move_doors(elapsed);
+		lamp_flicker(moment);
 
 		// the way out. the level had no end: one walked until one
 		// stopped. standing on it closes the keep behind us.
