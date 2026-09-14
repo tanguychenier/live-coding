@@ -35,10 +35,14 @@ int main(void)
 
 	// facing east, with the camera plane across the line of sight
 	struct player player = {
-		.x = 3.5, .y = 3.5,
+		.x = 0.0, .y = 0.0,
 		.dir_x = 1.0, .dir_y = 0.0,
 		.plane_x = 0.0, .plane_y = FIELD_OF_VIEW,
 	};
+	// the file says where we start and where the way out is
+	int exit_x, exit_y;
+	level_marks(&player.x, &player.y, &exit_x, &exit_y,
+		    &player.dir_x, &player.dir_y);
 	struct keys keys = { 0 };
 	double last = now_in_seconds();
 
@@ -48,6 +52,11 @@ int main(void)
 		last = moment;
 
 		screen_read_keys(&screen, &keys);
+
+		// the way out. the level had no end: one walked until one
+		// stopped. standing on it closes the keep behind us.
+		if ((int)player.x == exit_x && (int)player.y == exit_y)
+			keys.quit = 1;
 
 		// every move is scaled by the time the last frame took, so the game
 		// runs at the same speed whatever the machine is doing

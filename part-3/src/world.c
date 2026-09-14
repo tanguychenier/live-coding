@@ -51,12 +51,57 @@ int load_level(const char *path)
 	return map_height > 0;
 }
 
+// which way to look when the game opens: down the longest clear line, so the
+// first thing anyone sees is a corridor and not a wall two steps away
+static void face_the_open(double x, double y, double *dir_x, double *dir_y)
+{
+	const double way[4][2] = { {1, 0}, {0, 1}, {-1, 0}, {0, -1} };
+	double best = -1.0;
+	*dir_x = 1.0;
+	*dir_y = 0.0;
+	for (int i = 0; i < 4; i++) {
+		double d = 0.0;
+		while (d < 20.0 && !is_wall((int)(x + way[i][0] * (d + 0.5)),
+					    (int)(y + way[i][1] * (d + 0.5))))
+			d += 0.5;
+		if (d > best) {
+			best = d;
+			*dir_x = way[i][0];
+			*dir_y = way[i][1];
+		}
+	}
+}
+
+// 'S' is where we stand at the first frame, 'E' is the way out
+void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
+		 double *dir_x, double *dir_y)
+{
+	*start_x = 1.5;
+	*start_y = 1.5;
+	*exit_x = -1;
+	*exit_y = -1;
+	for (int y = 0; y < map_height; y++)
+		for (int x = 0; map[y][x]; x++) {
+			if (map[y][x] == 'S') {
+				*start_x = x + 0.5;
+				*start_y = y + 0.5;
+			} else if (map[y][x] == 'E') {
+				*exit_x = x;
+				*exit_y = y;
+			}
+		}
+	face_the_open(*start_x, *start_y, dir_x, dir_y);
+}
+
 int is_wall(int x, int y)
 {
 	if (x < 0 || x >= map_width || y < 0 || y >= map_height
 	    || x >= (int)strlen(map[y]))
 		return 1;
-	return map[y][x] != '.';
+	// the file carries more than walls and floor: where the player
+	// starts, and where the way out is. only a wall stops anyone.
+	char c = map[y][x];
+	return !(c == '.' || c == 'S' || c == 'E');
 }
 
 // each axis is tested on its own, so a shoulder against a wall keeps sliding
