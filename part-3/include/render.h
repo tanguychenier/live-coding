@@ -3,6 +3,12 @@
 
 #include "world.h"
 
+// a colour is three bytes in one number: where each one starts, and what it
+// takes to keep a single one. every blend of colours starts here
+#define RED_SHIFT   16
+#define GREEN_SHIFT 8
+#define CHANNEL     0xff
+
 // how wide the view is: 0.66 against a unit direction is about 66 degrees
 #define FIELD_OF_VIEW 0.66
 
