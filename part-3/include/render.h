@@ -28,6 +28,14 @@
 
 #define MAP_WALL   0x6f7b8f
 #define MAP_FLOOR  0x161a22
+// a door is not a wall on the map, even shut: drawn as one, the rooms look
+// like squares with nothing joining them.
+#define MAP_DOOR   0xc6964a
+#define MAP_FRAME  0x8a94a6
+#define MAP_UNSEEN 0x0e1116
+// how thick the frame is, and how much of the world shows through the map
+#define MAP_EDGE   2
+#define MAP_ALPHA  0.78
 #define MAP_HEADING 0xe8b04b
 #define MAP_PLAYER 0xd8534f
 

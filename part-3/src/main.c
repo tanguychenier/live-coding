@@ -45,7 +45,7 @@ int main(void)
 	int exit_x, exit_y;
 	level_marks(&player.x, &player.y, &exit_x, &exit_y,
 		    &player.dir_x, &player.dir_y);
-	struct keys keys = { 0 };
+	struct keys keys = { .map = 1 };
 	double last = now_in_seconds();
 
 	while (!keys.quit) {
@@ -61,6 +61,7 @@ int main(void)
 		}
 		move_doors(elapsed);
 		lamp_flicker(moment);
+		remember(&player);
 
 		// the way out. the level had no end: one walked until one
 		// stopped. standing on it closes the keep behind us.
@@ -81,7 +82,8 @@ int main(void)
 		fit_view_to_window(&player);
 		render_floor_and_ceiling(&player);
 		render_walls(&player);
-		render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
+		if (keys.map)
+			render_map(&player, MAP_CELL, MAP_LEFT, MAP_TOP);
 		screen_present(&screen);
 
 		// no need to draw faster than that, and without this the loop

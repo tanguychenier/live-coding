@@ -242,6 +242,21 @@ void render_walls(const struct player *player)
 	}
 }
 
+// the same pixel, but blended with what is already there. `part` says how
+// much of the new colour wins, from 0 to 1.
+static void blend(int x, int y, unsigned int color, double part)
+{
+	if (x < 0 || x >= view_width || y < 0 || y >= view_height)
+		return;
+	unsigned int under = view[y * view_width + x];
+	unsigned int out = 0;
+	for (int d = 0; d <= RED_SHIFT; d += GREEN_SHIFT) {
+		double a = (under >> d) & CHANNEL, b = (color >> d) & CHANNEL;
+		out |= (unsigned int)(a + (b - a) * part) << d;
+	}
+	view[y * view_width + x] = out;
+}
+
 // one pixel, if it is on the screen at all. the heading line runs off the
 // map, and until now it wrote wherever that landed in memory
 static void put_pixel(int x, int y, unsigned int color)
@@ -253,13 +268,37 @@ static void put_pixel(int x, int y, unsigned int color)
 // the same map, now small enough to live in a corner
 void render_map(const struct player *player, int cell, int left, int top)
 {
+	// the frame is always there, even over what has not been seen: without it
+	// nothing says how big the level is
+	int l = map_width * cell, h = map_height * cell;
+	for (int i = -MAP_EDGE; i < l + MAP_EDGE; i++)
+		for (int e = 1; e <= MAP_EDGE; e++) {
+			put_pixel(left + i, top - e, MAP_FRAME);
+			put_pixel(left + i, top + h + e - 1, MAP_FRAME);
+		}
+	for (int j = -MAP_EDGE; j < h + MAP_EDGE; j++)
+		for (int e = 1; e <= MAP_EDGE; e++) {
+			put_pixel(left - e, top + j, MAP_FRAME);
+			put_pixel(left + l + e - 1, top + j, MAP_FRAME);
+		}
+
+	// what we do not know is dark, not missing, and the
+	// whole thing is translucent over the world
+	for (int j = 0; j < h; j++)
+		for (int i = 0; i < l; i++)
+			blend(left + i, top + j, MAP_UNSEEN, MAP_ALPHA);
+
 	for (int y = 0; y < map_height; y++)
 		for (int x = 0; x < map_width; x++) {
-			unsigned int color = is_wall(x, y) ? MAP_WALL : MAP_FLOOR;
+			// what we have not walked past is not on the map yet
+			if (!is_seen(x, y))
+				continue;
+			unsigned int color = is_door(x, y) ? MAP_DOOR
+				: is_wall(x, y) ? MAP_WALL : MAP_FLOOR;
 			for (int line = 0; line < cell; line++)
 				for (int column = 0; column < cell; column++)
-					put_pixel(left + x * cell + column,
-						top + y * cell + line, color);
+					blend(left + x * cell + column,
+						top + y * cell + line, color, MAP_ALPHA);
 		}
 
 	// where we stand, and which way we look

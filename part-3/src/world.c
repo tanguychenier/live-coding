@@ -17,6 +17,10 @@ int map_width, map_height;
 // not an object
 static double *doors;
 
+// what we have seen. a map that shows the whole level from the first second
+// leaves nothing to find; this one fills in as one goes.
+static char *seen;
+
 // what the level file can hold. a wall is anything that is not floor.
 int load_level(const char *path)
 {
@@ -58,7 +62,9 @@ int load_level(const char *path)
 	if (map_height > 0) {
 		free(doors);
 		doors = calloc((size_t)map_width * map_height, sizeof(*doors));
-		if (!doors)
+		free(seen);
+		seen = calloc((size_t)map_width * map_height, 1);
+		if (!doors || !seen)
 			return 0;
 	}
 	return map_height > 0;
@@ -134,6 +140,30 @@ void move_doors(double elapsed)
 			doors[i] += elapsed / DOOR_SECONDS;
 			if (doors[i] > 1.0)
 				doors[i] = 1.0;
+		}
+}
+
+int is_seen(int x, int y)
+{
+	if (!seen || x < 0 || y < 0 || x >= map_width || y >= map_height)
+		return 0;
+	return seen[y * map_width + x];
+}
+
+// everything a few steps away, and nothing behind a wall: we mark what the
+// light really reaches
+void remember(const struct player *player)
+{
+	if (!seen)
+		return;
+	int cx = (int)player->x, cy = (int)player->y;
+	for (int y = cy - SEEN_REACH; y <= cy + SEEN_REACH; y++)
+		for (int x = cx - SEEN_REACH; x <= cx + SEEN_REACH; x++) {
+			if (x < 0 || y < 0 || x >= map_width || y >= map_height)
+				continue;
+			if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > SEEN_REACH * SEEN_REACH)
+				continue;
+			seen[y * map_width + x] = 1;
 		}
 }
 

@@ -187,6 +187,12 @@ void screen_read_keys(struct screen *screen, struct keys *keys)
 				if (down)
 					keys->push = 1;
 				break;
+			case XK_m:
+				// on release, not on press: a held key repeats,
+				// and the map used to blink
+				if (!down)
+					keys->map = !keys->map;
+				break;
 			case XK_F11:
 				if (down)
 					screen_toggle_fullscreen(screen);

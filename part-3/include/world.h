@@ -23,6 +23,11 @@ void level_marks(double *start_x, double *start_y, int *exit_x, int *exit_y,
 int is_wall(int x, int y);
 int wall_kind(int x, int y);
 int is_lamp(int x, int y);
+// how far the player remembers what has been seen
+#define SEEN_REACH 4
+
+int is_seen(int x, int y);
+void remember(const struct player *player);
 // and this one no longer holds: it flickers
 int lamp_faulty(int x, int y);
 // a door takes a second to open, and once it is open this far one walks
