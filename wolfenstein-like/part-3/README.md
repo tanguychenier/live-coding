@@ -8,9 +8,9 @@
 
 > **Part 3 of 4**, written during one live session. [All the parts](../) of this game.
 
-The Keep, a first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is ours.
+The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D did it. One ray per column of the screen, walking a grid of characters. No game engine and no framework. X11 hands over a window and a block of memory, and every pixel after that is ours.
 
-Written from an empty file during a single live session, 1907 lines in 3 h 43:
+Written from an empty file during a single live session, 1907 lines in 3 h 43.
 **https://youtu.be/YKUUJJBlzc4**
 
 <div align="center">
@@ -41,7 +41,7 @@ everything else is in `main.c`, and one line of gcc builds it.
 
 ## How the walls are drawn
 
-The technique is not new: it is how Wolfenstein 3D drew its corridors in 1992,
+The technique is not new. It is how Wolfenstein 3D drew its corridors in 1992,
 and it has been written up many times since. What is here is the
 implementation, written from an empty file.
 
@@ -49,7 +49,7 @@ The world is a grid of characters, and a wall is anything that is not a dot.
 For each of the 320 columns of the screen, one ray leaves the eye and walks
 that grid, always stepping across whichever grid line is nearest, so no
 square is ever missed and none is visited twice. Where the ray meets a wall,
-the distance it covered decides how tall that wall is drawn: near is tall, far
+the distance it covered decides how tall that wall is drawn. Near is tall, far
 is short, and a column of pixels is all it takes.
 
 The distance is measured on the camera plane rather than from the eye. Measured

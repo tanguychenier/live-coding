@@ -1,7 +1,7 @@
 [
   {
     "dossier": "wolfenstein-like",
-    "resume": "The Keep, a first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is ours.",
+    "resume": "The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D did it. One ray per column of the screen, walking a grid of characters. No game engine and no framework. X11 hands over a window and a block of memory, and every pixel after that is ours.",
     "court": "One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.",
     "partie": 3,
     "total": 4,

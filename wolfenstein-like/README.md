@@ -6,7 +6,7 @@
 
 </div>
 
-> **Written across 4 live sessions**, 3 of them done. Each part has its own folder: the code exactly as it stood when that stream ended.
+> **Written across 4 live sessions**, 3 of them done. Each part has its own folder, with the code exactly as it stood when that stream ended.
 
 | | | |
 |---|---|---|
@@ -15,7 +15,7 @@
 | **[Part 3](part-3/)** | the world comes out of a file: several kinds of wall, doors, an exit | [watch](https://youtu.be/YKUUJJBlzc4) · 3 h 43 |
 | Part 4 | it becomes a game: drones that fire back, ammo, medkits, the way out | not yet |
 
-The Keep, a first-person 3D engine written in C: one ray per column of the screen, walking a grid of characters. No game engine and no framework: X11 hands over a window and a block of memory, every pixel after that is ours.
+The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D did it. One ray per column of the screen, walking a grid of characters. No game engine and no framework. X11 hands over a window and a block of memory, and every pixel after that is ours.
 
 
 
@@ -48,7 +48,7 @@ everything else is in `main.c`, and one line of gcc builds it.
 
 ## How the walls are drawn
 
-The technique is not new: it is how Wolfenstein 3D drew its corridors in 1992,
+The technique is not new. It is how Wolfenstein 3D drew its corridors in 1992,
 and it has been written up many times since. What is here is the
 implementation, written from an empty file.
 
@@ -56,7 +56,7 @@ The world is a grid of characters, and a wall is anything that is not a dot.
 For each of the 320 columns of the screen, one ray leaves the eye and walks
 that grid, always stepping across whichever grid line is nearest, so no
 square is ever missed and none is visited twice. Where the ray meets a wall,
-the distance it covered decides how tall that wall is drawn: near is tall, far
+the distance it covered decides how tall that wall is drawn. Near is tall, far
 is short, and a column of pixels is all it takes.
 
 The distance is measured on the camera plane rather than from the eye. Measured
