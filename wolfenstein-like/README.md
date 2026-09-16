@@ -10,10 +10,10 @@
 
 | | | |
 |---|---|---|
-| **[Part 1](part-1/)** | the engine itself: one ray per column, and the walls stand up | [watch](https://youtu.be/4QS_gnC-Vz8) · 1 h 09 |
+| **[Part 1](part-1/)** | the engine itself, one ray per column, and the walls stand up | [watch](https://youtu.be/4QS_gnC-Vz8) · 1 h 09 |
 | **[Part 2](part-2/)** | textures on the walls, then on the floor and the ceiling | [watch](https://youtu.be/SeKs2vCeFUk) · 1 h 42 |
-| **[Part 3](part-3/)** | the world comes out of a file: several kinds of wall, doors, an exit | [watch](https://youtu.be/YKUUJJBlzc4) · 3 h 43 |
-| **[Part 4](part-4/)** | it becomes a game: drones that fire back, ammo, medkits, the way out | [watch](https://youtu.be/crEy4UbZ3qs) · 6 h 11 |
+| **[Part 3](part-3/)** | the world comes out of a file, several kinds of wall, doors, an exit | [watch](https://youtu.be/YKUUJJBlzc4) · 3 h 43 |
+| **[Part 4](part-4/)** | it becomes a game, things that see you and come, a fight, a story, and the level played to the end | [video 1](https://youtu.be/ib2nzm4y6aI) · [video 2](https://youtu.be/crEy4UbZ3qs) · 6 h 11 |
 
 The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D did it. One ray per column of the screen, walking a grid of characters. No game engine and no framework. X11 hands over a window and a block of memory, and every pixel after that is ours.
 

@@ -6,11 +6,14 @@
 
 </div>
 
-> **Part 4 of 4**, written during one live session. [All the parts](../) of this game.
+> **Part 4 of 4**, written across two live sessions, the first cut short, the second finishing what it began. [All the parts](../) of this game.
 
 The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D did it. One ray per column of the screen, walking a grid of characters. No game engine and no framework. X11 hands over a window and a block of memory, and every pixel after that is ours.
 
-Written from an empty file during a single live session, 5825 lines in 6 h 11.
+5825 lines by the end. First video, the fight, the ending of the level and the arcade mode.
+**https://youtu.be/ib2nzm4y6aI**
+
+Second video, 6 h 11, the sound, the story, the doors, the crew, the boss, and the level played to the end.
 **https://youtu.be/crEy4UbZ3qs**
 
 <div align="center">
@@ -25,20 +28,28 @@ Written from an empty file during a single live session, 5825 lines in 6 h 11.
 ## Running it
 
 ```sh
-gcc -Wall -Wextra -O2 -Iinclude -o game src/demo.c src/fight.c src/light.c src/main.c src/render.c src/screen.c src/sound.c src/sprite.c src/story.c src/text.c src/texture.c src/thing.c src/trigger.c src/world.c -lX11 -lm && ./game
+gcc -Wall -Wextra -O2 -Iinclude -o game src/demo.c src/fight.c src/light.c src/main.c src/render.c src/screen.c src/sound.c src/sprite.c src/story.c src/text.c src/texture.c src/thing.c src/trigger.c src/world.c -lX11 -lasound -lm && ./game
 ```
 
-A C compiler and the X11 headers (`libx11-dev` on Debian and Ubuntu). Nothing else.
+A C compiler, the X11 headers and the ALSA headers (`libx11-dev` and `libasound2-dev` on Debian and Ubuntu). Nothing else.
 
 | | |
 |---|---|
-| arrow up / down | walk forward and back |
+| arrow up / down, `w` `s` | walk forward and back |
 | arrow left / right | turn |
+| mouse | look, after a click. `escape` gives it back |
 | `a` `d` | step sideways |
-| `escape` | quit |
+| `ctrl` | attack |
+| `1` `2` | the pipe, the sidearm |
+| `space` | open a door |
+| `m` | the map |
+| `n` | sound on and off |
+| `F11` | full screen |
+| `escape` | the menu |
 
-No engine, no library, no framework. X11 gives a window and a block of memory;
-everything else is in `main.c`, and one line of gcc builds it.
+No engine, no library, no framework. X11 gives a window and a block of memory,
+ALSA takes a stream of numbers, everything else is in `src/`, and one line of
+gcc builds it.
 
 ## How the walls are drawn
 
