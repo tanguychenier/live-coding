@@ -3,9 +3,12 @@
 
 #include <X11/Xlib.h>
 
-// one view pixel is a block of PIXEL by PIXEL pixels: two keeps the edges
-// without costing four times as many rays
-#define PIXEL       2
+// the size of a view pixel should not depend on the window. with a fixed
+// block of two, a small window renders very few rays and a wide one renders a
+// very fine picture, so the game looks different at every size. instead we
+// aim for a rendered height, and the block is whatever gets us closest to it.
+#define VIEW_TARGET_H 400
+#define PIXEL_MAX     4
 // the size the window opens at. after that a wider window shows more world,
 // it does not blow up what was already there
 #define WIN_WIDTH   1280
@@ -22,8 +25,11 @@ extern int view_width, view_height;
 #define HORIZON     (view_height / 2)
 
 // XCreateImage wants to know how each row of pixels is padded, in bits. this
-// is NOT the colour depth: 32 is what a modern display expects
+// is not the colour depth: 32 is what a modern display expects
 #define SCANLINE_PAD 32
+
+// how many radians one pixel of mouse movement is worth
+#define MOUSE_SPEED 0.0032
 
 #define GAME_NAME  "The Keep"
 #define WINDOW_BG  0x182636
@@ -41,14 +47,25 @@ struct screen {
 	int width, height;
 	int scale, left, top;
 	int full;                   // are we filling the screen?
+	// the mouse turns the head, because a first person view turned with the
+	// arrow keys plays like 1992. every frame we read how far the pointer
+	// moved, then we pull it back to the centre. the game only takes the
+	// mouse on the first click.
+	int grab;                   // is the mouse ours
+	int warped;                 // it has been put back once already
+	Cursor blank;               // and it is not drawn while playing
 };
 
 struct keys {
 	int forward, back, left, right, strafe_left, strafe_right, quit;
 	int push;        // a press on space, waiting to be read
+	int hit;         // a press on ctrl: fists first, then the gun
+	int mute;        // a press on n: the sound goes away
 	int map;         // is the map on screen? M takes it away
-	int hit;         // a press on ctrl: swing
-	int weapon;      // 1 or 2: the bar or the sidearm
+	int menu;        // escape: the menu opens or closes
+	int validate;    // entree
+	int weapon;      // 1 or 2: the bar or the gun
+	double look;     // how far the mouse moved sideways, in radians
 	int any;         // somebody is at the keys
 };
 
@@ -57,6 +74,9 @@ int screen_open(struct screen *screen);
 int screen_resize(struct screen *screen, int width, int height);
 void screen_toggle_fullscreen(struct screen *screen);
 void screen_read_keys(struct screen *screen, struct keys *keys);
+// gives the mouse back to the desktop. the menu does it, and so does losing
+// focus.
+void screen_release_mouse(struct screen *screen);
 void screen_present(struct screen *screen);
 
 #endif
