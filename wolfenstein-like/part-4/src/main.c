@@ -170,7 +170,7 @@ int main(void)
 		}
 		double damage = things_update(&player, elapsed, moment);
 		if (!won_at)
-			fight_take(damage, moment);
+			fight_take(damage);
 		fight_step(elapsed);
 		move_doors(elapsed);
 		lamp_flicker(moment);

@@ -6,7 +6,9 @@
 #include "light.h"
 #include "render.h"
 #include "screen.h"
+#include "sound.h"
 #include "sprite.h"
+#include "story.h"
 #include "text.h"
 #include "thing.h"
 
@@ -16,6 +18,8 @@ void fight_reset(void)
 {
 	memset(&fight, 0, sizeof fight);
 	fight.health = PLAYER_HEALTH;
+	fight.ammo = AMMO_START;
+	fight.has_gun = 0;      // we start with a bar, not with a gun
 }
 
 // what is in hand, decided in one place. the player's own pick comes
@@ -33,9 +37,8 @@ void fight_heal(double amount)
 		fight.health = PLAYER_HEALTH;
 }
 
-void fight_take(double damage, double now)
+void fight_take(double damage)
 {
-	(void)now;
 	if (damage <= 0.0)
 		return;
 	fight.health -= damage;
@@ -48,12 +51,12 @@ void fight_step(double elapsed)
 {
 	if (fight.flash > 0.0)
 		fight.flash -= elapsed;
-	if (fight.hurt > 0.0)
-		fight.hurt -= elapsed;
 	if (fight.spark > 0.0)
 		fight.spark -= elapsed;
 	if (fight.hitmark > 0.0)
 		fight.hitmark -= elapsed;
+	if (fight.hurt > 0.0)
+		fight.hurt -= elapsed;
 }
 
 // the swing is a cone, and that is the whole point of a bar: it forgives
@@ -69,15 +72,18 @@ int fight_strike(const struct player *player, double now)
 	if (gun) {
 		fight.ammo--;
 		fight.flash = 0.08;
+		sound_play(SFX_SHOT, 0.0);
+		fight.emptied = fight.ammo == 0;
 		// a gunshot carries. that is what makes rounds cost more
 		// than their count: you win one fight and wake two.
-		things_hear(player->x, player->y, 10.0, now);
+		things_hear(player->x, player->y, GUNSHOT_CARRIES, now);
+	} else {
+		sound_play(SFX_PUNCH, 0.0);
 	}
 
-	// the bullet stops at the first wall. without this line it went
-	// through partitions, and since nothing showed the impact, the
-	// player was right to think everything was a hit.
-	double wall = wall_depth ? wall_depth[view_width / 2] : 1e9;
+	// the round stops at the first wall, because a bullet does not go through
+	// partitions, and the impact shows where it stopped
+	double wall = wall_depth ? wall_depth[view_width / 2] : VERY_FAR;
 	struct thing *best = NULL;
 	double nearest = gun ? GUN_RANGE : PIPE_REACH;
 	if (gun && nearest > wall)
@@ -100,13 +106,13 @@ int fight_strike(const struct player *player, double now)
 				continue;
 			double across = fabs(dx * -player->dir_y
 					    + dy * player->dir_x);
-			double radius = t->tough ? 0.46 : 0.36;
+			double radius = t->boss ? 0.62 : t->tough ? 0.46 : 0.36;
 			if (across > radius)
 				continue;
-		}
-		// the bar sweeps wide, and that is its whole point
-		if (!gun && (dx * player->dir_x + dy * player->dir_y) / d < PIPE_ARC)
+		} else if ((dx * player->dir_x + dy * player->dir_y) / d < PIPE_ARC) {
+			// the bar sweeps wide, and that is its whole point
 			continue;
+		}
 		nearest = d;
 		best = t;
 	}
@@ -124,15 +130,20 @@ int fight_strike(const struct player *player, double now)
 	}
 	if (!best)
 		return 0;
-	best->health -= gun ? GUN_DAMAGE : PIPE_DAMAGE;
+	best->health -= (gun ? GUN_DAMAGE : PIPE_DAMAGE) * thing_weak(best);
 	fight.hitmark = 0.16;
 	// it takes the blow: a quarter second where it stops coming, and
 	// that is what gives melee its rhythm
 	best->stagger = now + (gun ? 0.16 : 0.26);
 	best->hurt_at = now;
+	sound_play(SFX_IMPACT, nearest);
 	if (best->health <= 0.0) {
 		best->state = THING_DEAD;
 		fight.put_down++;
+		sound_play(SFX_DIE, nearest);
+		// the boss falls with all its weight, and the whole deck feels it
+		if (best->boss)
+			story_hit(now, 1.8, best->x, best->y);
 	} else {
 		// being hit wakes it, even if it had not seen you
 		if (best->state == THING_IDLE)
@@ -147,7 +158,7 @@ int fight_strike(const struct player *player, double now)
 // of view of the game, glove included. a held weapon is a volume seen in
 // perspective, and that does not work out when drawn flat.
 static void draw_sheet(struct sprite *p, int frame, double lit,
-		       int moving, int flash)
+			  int moving, int flash)
 {
 	if (!p->pixels)
 		return;
@@ -176,7 +187,7 @@ static void draw_sheet(struct sprite *p, int frame, double lit,
 		for (int x = xa; x < xb; x++) {
 			int sx = (x - bx) * p->width / view_width;
 			unsigned int c = sprite_at(p, frame, sx, sy);
-			if ((c >> 24) < 128)
+			if (!sprite_solid(c))
 				continue;
 			// it takes the light of the room you stand in.
 			// rendered lit and pasted as is, it glowed like a
