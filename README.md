@@ -22,7 +22,7 @@ code, no cuts, no second take. The commit lands when the stream ends.
 
 One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.
 
-<sub>C and X11 · 5825 lines · written live in 6 h 11 · <a href="https://youtu.be/crEy4UbZ3qs">watch it</a></sub>
+<sub>C and X11 · 5825 lines · written live in 6 h 11 · <a href="https://youtu.be/crEy4UbZ3qs">watch it</a> · <a href="wolfenstein-like/doc/the-keep-le-cours.pdf">the course, 328 pages</a></sub>
 
 </td>
 <td width="50%" valign="top">

@@ -21,6 +21,8 @@ The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D di
 
 **[Play it in the browser](https://tanguychenier.github.io/live-coding/keep/)**
 
+**[Read the course](doc/the-keep-le-cours.pdf)**, 328 pages in French. Every chapter of the four sessions, with what to understand, the maths worked by hand, the code to write and what the screen shows.
+
 <div align="center">
 
 <img src="part-4/captures/jeu-1.png" width="49%" alt="the game running">
@@ -34,10 +36,10 @@ The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D di
 
 ```sh
 cd part-4
-gcc -Wall -Wextra -O2 -Iinclude -o game src/demo.c src/fight.c src/light.c src/main.c src/render.c src/screen.c src/sound.c src/sprite.c src/story.c src/text.c src/texture.c src/thing.c src/trigger.c src/world.c -lX11 -lm && ./game
+gcc -Wall -Wextra -O2 -Iinclude -o game src/demo.c src/fight.c src/light.c src/main.c src/render.c src/screen.c src/sound.c src/sprite.c src/story.c src/text.c src/texture.c src/thing.c src/trigger.c src/world.c -lX11 -lasound -lm && ./game
 ```
 
-A C compiler and the X11 headers (`libx11-dev` on Debian and Ubuntu). Nothing else.
+A C compiler, the X11 headers and the ALSA headers (`libx11-dev` and `libasound2-dev` on Debian and Ubuntu). Nothing else.
 
 | | |
 |---|---|
