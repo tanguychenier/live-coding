@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "render.h"
 #include "light.h"
 
@@ -5,7 +7,6 @@
 #include "texture.h"
 
 #include <math.h>
-#include <stdlib.h>
 
 // one column of the wall, read down one column of the texture
 static void draw_wall_column(int x, int top, int height, int tex_x,
@@ -255,8 +256,7 @@ void render_walls(const struct player *player)
 	// it follows the width of the view, which changes with the window
 	static int columns;
 	if (columns != view_width) {
-		double *bigger = realloc(wall_depth,
-			(size_t)view_width * sizeof(*wall_depth));
+		double *bigger = realloc(wall_depth, (size_t)view_width * sizeof(*wall_depth));
 		if (bigger) {
 			wall_depth = bigger;
 			columns = view_width;
@@ -330,9 +330,10 @@ static void put_pixel(int x, int y, unsigned int color)
 // the same map, now small enough to live in a corner
 void render_map(const struct player *player, int cell, int left, int top)
 {
-	// the frame is always there, even over what has not been seen: without it
-	// nothing says how big the level is
-	int l = map_width * cell, h = map_height * cell;
+	int half_x = MAP_WINDOW, half_y = MAP_WINDOW * 3 / 4;
+	int l = (2 * half_x + 1) * cell, h = (2 * half_y + 1) * cell;
+	int cx = (int)player->x, cy = (int)player->y;
+
 	for (int i = -MAP_EDGE; i < l + MAP_EDGE; i++)
 		for (int e = 1; e <= MAP_EDGE; e++) {
 			put_pixel(left + i, top - e, MAP_FRAME);
@@ -350,22 +351,23 @@ void render_map(const struct player *player, int cell, int left, int top)
 		for (int i = 0; i < l; i++)
 			blend(left + i, top + j, MAP_UNSEEN, MAP_ALPHA);
 
-	for (int y = 0; y < map_height; y++)
-		for (int x = 0; x < map_width; x++) {
-			// what we have not walked past is not on the map yet
+	for (int dy = -half_y; dy <= half_y; dy++)
+		for (int dx = -half_x; dx <= half_x; dx++) {
+			int x = cx + dx, y = cy + dy;
 			if (!is_seen(x, y))
 				continue;
 			unsigned int color = is_door(x, y) ? MAP_DOOR
 				: is_wall(x, y) ? MAP_WALL : MAP_FLOOR;
 			for (int line = 0; line < cell; line++)
 				for (int column = 0; column < cell; column++)
-					blend(left + x * cell + column,
-						top + y * cell + line, color, MAP_ALPHA);
+					blend(left + (dx + half_x) * cell + column,
+						top + (dy + half_y) * cell + line,
+						color, MAP_ALPHA);
 		}
 
 	// where we stand, and which way we look
-	int dot_x = left + (int)(player->x * cell);
-	int dot_y = top + (int)(player->y * cell);
+	int dot_x = left + half_x * cell + cell / 2;
+	int dot_y = top + half_y * cell + cell / 2;
 	for (int step = MAP_DOT + 1; step < MAP_ARROW * cell; step++)
 		put_pixel(dot_x + (int)(player->dir_x * step),
 			dot_y + (int)(player->dir_y * step), MAP_HEADING);

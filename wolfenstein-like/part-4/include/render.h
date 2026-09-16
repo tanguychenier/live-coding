@@ -27,6 +27,8 @@ extern double *wall_depth;
 // is exactly what the numbers below used to mean.
 #define HUD_DIVISOR 640
 #define MAP_CELL   3
+// how many cells the map window shows on each side of the player
+#define MAP_WINDOW 11
 #define MAP_LEFT   4
 #define MAP_TOP    4
 
