@@ -25,6 +25,25 @@ static char *seen;
 // walk back over it and help yourself forever.
 static char *taken;
 
+// whether the door system has given way
+static int seals_released;
+
+// when the system gives way, the doors do not offer anything, they open.
+// while it holds, a sealed door says nothing and does not answer, and when it
+// gives, every sealed door on the deck slides open by itself. the player is
+// not granted a permission, he hears the deck open.
+void world_release_seals(void)
+{
+	seals_released = 1;
+	if (!doors)
+		return;
+	for (int y = 0; y < map_height; y++)
+		for (int x = 0; x < (int)strlen(map[y]); x++)
+			if (map[y][x] == 'L' && doors[y * map_width + x] == 0.0)
+				doors[y * map_width + x] = 0.001;
+}
+int  world_seals_released(void) { return seals_released; }
+
 // what the level file can hold. a wall is anything that is not floor.
 int load_level(const char *path)
 {
@@ -89,6 +108,7 @@ int load_level(const char *path)
 		taken = calloc((size_t)map_width * map_height, 1);
 		if (!doors || !seen || !taken)
 			return 0;
+		seals_released = 0;
 	}
 	return map_height > 0;
 }
@@ -158,15 +178,35 @@ static int door_in_front(const struct player *player, int *door_x, int *door_y)
 int door_ahead(const struct player *player)
 {
 	int x, y;
-	return door_in_front(player, &x, &y);
+	if (!door_in_front(player, &x, &y))
+		return 0;
+	return !(map[y][x] == 'L' && !seals_released);
 }
 
-// we nudge it once: after that the two leaves finish their travel
-void push_door(const struct player *player)
+// we nudge the door once, and after that the two leaves finish their travel
+// on their own. the door also answers, because what it does is what the
+// player learns.
+enum push push_door(const struct player *player)
 {
 	int x, y;
-	if (door_in_front(player, &x, &y))
-		doors[y * map_width + x] = 0.001;
+	if (!door_in_front(player, &x, &y))
+		return PUSH_NOTHING;
+	char c = map[y][x];
+	if (c == 'L' && !seals_released)
+		return PUSH_SEALED;
+	if (c == 'D' && !have_badge())
+		return PUSH_LOCKED;
+	if (doors[y * map_width + x] > 0.0)
+		return PUSH_NOTHING;
+	doors[y * map_width + x] = 0.001;
+	return c == 'J' ? PUSH_JAMMED : PUSH_OPENS;
+}
+
+double door_limit(int x, int y)
+{
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height)
+		return 1.0;
+	return map[y][x] == 'J' ? DOOR_JAMMED_MAX : 1.0;
 }
 
 // the two leaves take a second to part, and they never close again: coming
@@ -175,12 +215,24 @@ void move_doors(double elapsed)
 {
 	if (!doors)
 		return;
-	for (int i = 0; i < map_width * map_height; i++)
-		if (doors[i] > 0.0 && doors[i] < 1.0) {
+	for (int i = 0; i < map_width * map_height; i++) {
+		double max = door_limit(i % map_width, i / map_width);
+		if (doors[i] > 0.0 && doors[i] < max) {
 			doors[i] += elapsed / DOOR_SECONDS;
-			if (doors[i] > 1.0)
-				doors[i] = 1.0;
+			if (doors[i] > max)
+				doors[i] = max;
 		}
+	}
+}
+
+int seen_count(void)
+{
+	int n = 0;
+	for (int y = 0; y < map_height; y++)
+		for (int x = 0; x < map_width; x++)
+			if (is_seen(x, y))
+				n++;
+	return n;
 }
 
 int is_seen(int x, int y)
@@ -231,7 +283,8 @@ int is_door(int x, int y)
 {
 	if (x < 0 || y < 0 || x >= map_width || y >= map_height)
 		return 0;
-	return map[y][x] == '+';
+	char c = map[y][x];
+	return c == '+' || c == 'J' || c == 'L' || c == 'D';
 }
 
 // a strip sits on a wall: the file puts a letter where the wall would be,
@@ -249,8 +302,7 @@ int is_lamp(int x, int y)
 // taken without stopping, and the eyes stay on the room.
 enum loot loot_at(int x, int y)
 {
-	if (x < 0 || y < 0 || x >= map_width || y >= map_height
-	    || (taken && taken[y * map_width + x]))
+	if (x < 0 || y < 0 || x >= map_width || y >= map_height || (taken && taken[y * map_width + x]))
 		return LOOT_NONE;
 	switch (map[y][x]) {
 	case 'K': return LOOT_BADGE;
@@ -320,11 +372,15 @@ int is_wall(int x, int y)
 	// the file carries more than walls and floor: where the player
 	// starts, and where the way out is. only a wall stops anyone.
 	char c = map[y][x];
-	if (c == '+')
+	// every door can be walked through, not only the ordinary one, because a
+	// sealed door that opens and stays a wall would end the level without a
+	// word. the jammed one never opens far enough to pass, and it is its
+	// limit that forbids it, not an exception written here.
+	if (is_door(x, y))
 		return door_at(x, y) < DOOR_WALKABLE;
-	return !(c == '.' || c == 'S' || c == 'E' || c == 'K'
-	         || c == 'x' || c == 'y' || c == 'X' || c == 'G'
-	         || c == 'A' || c == 'M');
+	return !(c == '.' || c == 'S' || c == 'E' || c == 'K' || c == 'G'
+	         || c == 'A' || c == 'M' || c == 'x' || c == 'y' || c == 'w'
+	         || c == 'Z' || c == 'X' || c == 'n' || c == 'h');
 }
 
 // the camera plane follows the shape of the window. its length is the field
