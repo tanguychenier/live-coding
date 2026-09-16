@@ -15,7 +15,7 @@ unsigned int ceiling_texture[TEX_SIZE * TEX_SIZE];
 // constants are arbitrary large odd numbers, any others would do as well
 double noise(int x, int y)
 {
-	unsigned int n = (unsigned int)(x * 374761393 + y * 668265263);
+	unsigned int n = (unsigned int)x * 374761393u + (unsigned int)y * 668265263u;
 	n = (n ^ (n >> 13)) * 1274126177u;
 	return (double)((n >> 16) & 0xffff) / 65535.0;
 }
@@ -186,6 +186,12 @@ static const struct plate DECK = {
 	.color = 0x2f3540, .light = 0x6d7b8c, .dark = 0x0f1218,
 	.seam = 0x090b10, .across = 4, .down = 4, .rivets = 0,
 };
+// the bulkhead of the last room is thick, almost black, and it gives nothing
+// back. you have to recognise the last room by its wall before you know why.
+static const struct plate VAULT = {
+	.color = 0x2a2b33, .light = 0x5d5f6e, .dark = 0x0a0a0e,
+	.seam = 0x050507, .across = 1, .down = 3, .rivets = 1,
+};
 static const struct plate ROOF = {
 	.color = 0x232833, .light = 0x525d6d, .dark = 0x080a0e,
 	.seam = 0x06080b, .across = 2, .down = 2, .rivets = 0,
@@ -274,6 +280,53 @@ static void make_lamp_wall(unsigned int *out, const struct plate *p,
 	neon_strip(out, TEX_SIZE / 2, TEX_SIZE / 2, 4, 34, glow);
 }
 
+// a plate ripped off, and what splashed on it. the tear is a hole in the
+// plating, with a curled edge that catches the light, the dark behind it, and
+// splashes that run downwards because blood runs. none of it is a decal, it
+// is the same plate as everywhere else with material taken away.
+static void make_torn(unsigned int *out, const struct plate *p)
+{
+	make_plating(out, p);
+	for (int y = 0; y < TEX_SIZE; y++)
+		for (int x = 0; x < TEX_SIZE; x++) {
+			// metal tears in straight lines, not in circles. a circle
+			// softened with noise gives an ink stain, while torn plating
+			// leaves facets and angles, so we draw seven spokes at random and
+			// join them with segments, and that is all.
+			double dx = x - 74.0, dy = y - 52.0;
+			double d = sqrt(dx * dx + dy * dy);
+			double a = (atan2(dy, dx) + 3.14159265) / 6.2831853 * 7.0;
+			int whole = (int)a;
+			double f = a - whole;
+			double r0 = 18.0 + 16.0 * noise(whole, 3);
+			double r1 = 18.0 + 16.0 * noise((whole + 1) % 7, 3);
+			double border = r0 + (r1 - r0) * f;
+			if (d < border) {
+				// the curled edge is light on the lit side and dark on the
+				// other, like a real fold in sheet metal
+				double fold = (border - d) / 7.0;
+				double toward_light = (-dx - dy) / (d + 1.0);
+				out[y * TEX_SIZE + x] = fold < 1.0
+					? mix(toward_light > 0.0 ? TORN_EDGE : 0x1b2027,
+						0x05070a, fold)
+					: 0x05070a;
+				continue;
+			}
+			double r = d;
+			// the splashes start at the hole and run down
+			double s = smooth_noise(x / 2, y, 7);
+			double reach = (r - 26.0) / 42.0;
+			double run_down = smooth_noise(x, y / 6, 5);
+			double stain = (1.0 - reach) * (s * 0.7 + run_down * 0.6) - 0.42;
+			if (reach < 1.0 && stain > 0.0) {
+				unsigned int blood = mix(BLOOD_DARK, BLOOD_WET,
+					fmin(1.0, stain * 2.4));
+				out[y * TEX_SIZE + x] = mix(out[y * TEX_SIZE + x],
+					blood, fmin(0.92, stain * 3.0));
+			}
+		}
+}
+
 void make_wall_textures(void)
 {
 	make_plating(wall_texture[0], &BULK);
@@ -283,6 +336,8 @@ void make_wall_textures(void)
 	make_lamp_wall(wall_texture[4], &HULL, NEON);
 	make_lamp_wall(wall_texture[5], &BULK, ALARM);
 	make_lamp_wall(wall_texture[6], &PARTITION, COLD);
+	make_torn(wall_texture[7], &HULL);
+	make_plating(wall_texture[8], &VAULT);
 }
 
 // the floor: dark tiles, tight, no rivets

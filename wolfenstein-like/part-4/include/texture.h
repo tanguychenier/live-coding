@@ -77,20 +77,32 @@ unsigned int loot_tile(int x, int y, unsigned int body, unsigned int edge);
 
 // several kinds of wall, so one room is not the next: a panel size and four
 // colours, still drawn in code
-#define WALL_KINDS 7
-#define DOOR_TEXTURE 3         // which of the seven is the door
+#define WALL_KINDS 9
+#define DOOR_TEXTURE 3         // which of the nine is the door
 // three colours of strip, one per zone: the gangway in service, the machine
 // room, and the hold on its emergency lighting
 #define LAMP_TEXTURE 4         // the ordinary strip, teal
 #define ALARM_TEXTURE 5        // the emergency one, amber
 #define COLD_TEXTURE 6         // and the cold white of the machines
+// the torn plating. the airlock does not say that something happened with a
+// text, it says it with its walls, a plate ripped off, the dark behind it,
+// and what splashed on it. it is the first thing the player sees.
+#define TORN_TEXTURE 7
+#define VAULT_TEXTURE 8        // the thick bulkhead of the last room
+#define BLOOD_DARK  0x3a0f0e
+#define BLOOD_WET   0x6e1c16
+#define TORN_EDGE   0x8f9aa8   // the metal curled up along the tear
 
 // the name stencilled on the airlock floor: four squares, three letters
 // each, every letter turned a quarter turn to read the way one walks
 #define STENCIL       "TANSOFTWARE"
-#define STENCIL_CELLS 4
-#define STENCIL_EACH  3        // how many letters to a square
-#define STENCIL_PAD   10       // the margin around a letter, in pixels
+// three tiles, for a geometric reason. with four, the middle of the band
+// falls half a cell off the player's line and the name looks shifted to the
+// left. with three, the middle falls exactly on the waking cell, and the word
+// is centred in the frame.
+#define STENCIL_CELLS 3
+#define STENCIL_EACH  4        // how many letters to a square
+#define STENCIL_PAD   7        // the margin around a letter, in pixels
 #define STENCIL_PAINT 0xb9c6cf
 #define STENCIL_WEAR  0.72     // the paint is worn, not fresh
 
