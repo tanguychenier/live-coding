@@ -19,6 +19,8 @@ The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D di
 
 
 
+**[Play it in the browser](https://tanguychenier.github.io/live-coding/keep/)**
+
 <div align="center">
 
 <img src="part-4/captures/jeu-1.png" width="49%" alt="the game running">

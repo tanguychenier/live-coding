@@ -11,6 +11,8 @@ Four fighters, two stages, three rounds. The opponent runs a state machine, and 
 Written from an empty file during a single live session, 665 lines in 2 h 09:
 **https://youtu.be/gJOMl3DYnhg**
 
+**[Play it in the browser](https://tanguychenier.github.io/live-coding/street-fighter/)**
+
 <div align="center">
 
 <img src="captures/jeu-1.png" width="49%" alt="the game running">

@@ -16,6 +16,8 @@ code, no cuts, no second take. The commit lands when the stream ends.
 
 <a href="wolfenstein-like"><img src="wolfenstein-like/part-4/captures/jeu-1.png" width="100%" alt="wolfenstein-like"></a>
 
+**[Play them in the browser](https://tanguychenier.github.io/live-coding/)**, no install, then read the code, one commit per step.
+
 ### [wolfenstein-like](wolfenstein-like)
 
 One ray per column of the screen, a grid of characters for a world, and every pixel drawn by hand.

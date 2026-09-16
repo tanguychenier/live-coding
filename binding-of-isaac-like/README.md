@@ -11,6 +11,8 @@ A Binding of Isaac-like: one floor of twelve rooms generated from a seed, a key 
 Written from an empty file during a single live session, 747 lines in 2 h 14:
 **https://youtu.be/-rA3q0Ju6_c**
 
+**[Play it in the browser](https://tanguychenier.github.io/live-coding/isaac/)**
+
 <div align="center">
 
 <img src="captures/jeu-1.png" width="49%" alt="the game running">
