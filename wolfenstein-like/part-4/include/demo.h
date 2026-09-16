@@ -26,6 +26,20 @@
 #define DEMO_ENGAGE     7.0
 #define DEMO_BODY       0.30
 #define DEMO_STANDOFF   1.6
+// the cabinet does not play the same game twice. it rolls a die of its own,
+// seeded on the clock, and the die decides where it starts among the first
+// points of the route, whether it stops at a point, for how long, and for how
+// long it turns its head
+#define DICE_SHIFT_A    13
+#define DICE_SHIFT_B    17
+#define DICE_SHIFT_C    5
+#define DICE_MASK       0xffffu
+#define DEMO_START_SPAN 4
+#define DEMO_LINGER_ODDS 0.4
+#define DEMO_LINGER_MIN 0.4
+#define DEMO_LINGER_MAX 1.4
+#define DEMO_GLANCE     0.25
+#define EVEN_ODDS       0.5
 
 // how many points the file gave
 int  demo_load(const char *path);
