@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TEC, games written live</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #070a10; color: #e8eef4;
+         font-family: "DejaVu Sans Mono", ui-monospace, monospace; }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 80px; }
+  header { margin-bottom: 40px; }
+  header .brand { font-size: 40px; letter-spacing: 0.42em; font-weight: bold; color: #6fe0c8;
+                  text-shadow: 0 0 24px rgba(111, 224, 200, 0.45); }
+  header p { color: #8fa3b5; margin: 6px 0 0; }
+  .jeu { display: flex; gap: 28px; margin: 0 0 44px; align-items: flex-start; }
+  .jeu .image img { width: 440px; max-width: 100%; display: block; border: 1px solid #1c2838; }
+  .jeu h2 { margin: 0 0 8px; font-size: 24px; color: #e8eef4; }
+  .jeu p { margin: 0 0 12px; color: #8fa3b5; }
+  .liens a { color: #8fa3b5; text-decoration: none; margin-right: 18px; }
+  .liens a:hover { color: #6fe0c8; }
+  .liens a.jouer { color: #070a10; background: #6fe0c8; padding: 6px 12px; border-radius: 3px; font-weight: bold; }
+  .parties { list-style: none; padding: 0; margin: 10px 0 0; color: #55677a; font-size: 13px; }
+  .parties a { color: #8fa3b5; text-decoration: none; }
+  .parties a:hover { color: #6fe0c8; }
+  footer { color: #55677a; font-size: 12px; margin-top: 60px; }
+  footer a { color: #8fa3b5; text-decoration: none; }
+  @media (max-width: 760px) { .jeu { flex-direction: column; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand">T E C</div>
+    <p>games written live, from an empty file. no engine, no framework. every one of them plays here, in the browser.</p>
+  </header>
+
+    <section class="jeu">
+      <a class="image" href="keep/"><img src="keep/carte.jpg" alt="The Keep"></a>
+      <div class="texte">
+        <h2>The Keep</h2>
+        <p>a first-person engine in C, in 2.5D, the way Wolfenstein 3D did it</p>
+        <p class="liens"><a class="jouer" href="keep/">play in the browser</a>
+           <a href="https://www.youtube.com/playlist?list=PLBPRrs12VQXc">watch it being written</a>
+           <a href="https://github.com/tanguychenier/live-coding/tree/main/wolfenstein-like">source</a></p>
+        <ul class='parties'><li><a href='https://youtu.be/4QS_gnC-Vz8'>part 1</a>, the engine itself</li><li><a href='https://youtu.be/SeKs2vCeFUk'>part 2</a>, textures drawn in code</li><li><a href='https://youtu.be/YKUUJJBlzc4'>part 3</a>, the world comes out of a file</li><li><a href='https://youtu.be/ib2nzm4y6aI'>part 4, video 1</a>, something in the dark</li><li><a href='https://youtu.be/crEy4UbZ3qs'>part 4, video 2</a>, the story, the sound, and the end</li></ul>
+      </div>
+    </section>
+    <section class="jeu">
+      <a class="image" href="street-fighter/"><img src="street-fighter/carte.jpg" alt="Street Fighter-like"></a>
+      <div class="texte">
+        <h2>Street Fighter-like</h2>
+        <p>four fighters, two stages, three rounds, in Lua and LOVE</p>
+        <p class="liens"><a class="jouer" href="street-fighter/">play in the browser</a>
+           <a href="https://youtu.be/gJOMl3DYnhg">watch it being written</a>
+           <a href="https://github.com/tanguychenier/live-coding/tree/main/street-fighter-like">source</a></p>
+        
+      </div>
+    </section>
+    <section class="jeu">
+      <a class="image" href="isaac/"><img src="isaac/carte.jpg" alt="Binding of Isaac-like"></a>
+      <div class="texte">
+        <h2>Binding of Isaac-like</h2>
+        <p>one floor, twelve rooms, a key, a boss, in Lua and LOVE</p>
+        <p class="liens"><a class="jouer" href="isaac/">play in the browser</a>
+           <a href="https://youtu.be/-rA3q0Ju6_c">watch it being written</a>
+           <a href="https://github.com/tanguychenier/live-coding/tree/main/binding-of-isaac-like">source</a></p>
+        
+      </div>
+    </section>
+  <footer>the source of every game is on <a href="https://github.com/tanguychenier/live-coding">github</a>, one commit per step, so you can follow along. the streams are on youtube.</footer>
+</main>
+</body>
+</html>
