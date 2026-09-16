@@ -43,8 +43,8 @@ int sprite_load(struct sprite *s, const char *path)
 	for (int n = 0; n < s->frames; n++)
 		for (int y = 0; y < s->height; y++)
 			for (int x = 0; x < s->width; x++)
-				if (s->pixels[((size_t)n * s->height + y)
-					      * s->width + x] >> 24 >= 128) {
+				if (sprite_solid(s->pixels[((size_t)n * s->height + y)
+						    * s->width + x])) {
 					if (x < s->x0) s->x0 = x;
 					if (y < s->y0) s->y0 = y;
 					if (x >= s->x1) s->x1 = x + 1;
@@ -58,10 +58,21 @@ int sprite_load(struct sprite *s, const char *path)
 	return 1;
 }
 
+void sprite_free(struct sprite *s)
+{
+	free(s->pixels);
+	memset(s, 0, sizeof *s);
+}
+
 unsigned int sprite_at(const struct sprite *s, int frame, int x, int y)
 {
 	if (!s->pixels || frame < 0 || frame >= s->frames
 	    || x < 0 || y < 0 || x >= s->width || y >= s->height)
 		return 0;
 	return s->pixels[((size_t)frame * s->height + y) * s->width + x];
+}
+
+int sprite_solid(unsigned int pixel)
+{
+	return (pixel >> ALPHA_SHIFT) >= ALPHA_OPAQUE;
 }

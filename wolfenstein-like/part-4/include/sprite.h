@@ -16,7 +16,13 @@ struct sprite {
 };
 
 int  sprite_load(struct sprite *s, const char *path);
-// one pixel of one frame, or 0 when it is clear or out of the sheet
+void sprite_free(struct sprite *s);
+// gives one pixel of one frame, or 0 when it is transparent or outside the
+// box
 unsigned int sprite_at(const struct sprite *s, int frame, int x, int y);
+// a pixel is drawn when its alpha, which is the top byte, is at least half
+#define ALPHA_SHIFT   24
+#define ALPHA_OPAQUE  128
+int sprite_solid(unsigned int pixel);
 
 #endif
