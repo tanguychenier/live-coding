@@ -1,37 +1,30 @@
 <div align="center">
 
-<img src="banniere.png" alt="wolfenstein-like" width="100%">
+<img src="../banniere.png" alt="wolfenstein-like" width="100%">
 
-[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/crEy4UbZ3qs) [![C](https://img.shields.io/badge/C-gnu17-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c) [![X11](https://img.shields.io/badge/X11-Xlib-1d2a3a?logo=x.org&logoColor=white)](https://www.x.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../LICENSE)
+[![watch the stream](https://img.shields.io/badge/watch%20the%20stream-YouTube-FF0000?logo=youtube&logoColor=white)](https://youtu.be/crEy4UbZ3qs) [![C](https://img.shields.io/badge/C-gnu17-00599C?logo=c&logoColor=white)](https://en.cppreference.com/w/c) [![X11](https://img.shields.io/badge/X11-Xlib-1d2a3a?logo=x.org&logoColor=white)](https://www.x.org) [![MIT](https://img.shields.io/badge/licence-MIT-green.svg)](../../LICENSE)
 
 </div>
 
-> **Written across 4 live sessions**, 4 of them done. Each part has its own folder, with the code exactly as it stood when that stream ended.
-
-| | | |
-|---|---|---|
-| **[Part 1](part-1/)** | the engine itself: one ray per column, and the walls stand up | [watch](https://youtu.be/4QS_gnC-Vz8) · 1 h 09 |
-| **[Part 2](part-2/)** | textures on the walls, then on the floor and the ceiling | [watch](https://youtu.be/SeKs2vCeFUk) · 1 h 42 |
-| **[Part 3](part-3/)** | the world comes out of a file: several kinds of wall, doors, an exit | [watch](https://youtu.be/YKUUJJBlzc4) · 3 h 43 |
-| **[Part 4](part-4/)** | it becomes a game: drones that fire back, ammo, medkits, the way out | [watch](https://youtu.be/crEy4UbZ3qs) · 6 h 11 |
+> **Part 4 of 4**, written during one live session. [All the parts](../) of this game.
 
 The Keep, a first-person engine written in C, in 2.5D, the way Wolfenstein 3D did it. One ray per column of the screen, walking a grid of characters. No game engine and no framework. X11 hands over a window and a block of memory, and every pixel after that is ours.
 
-
+Written from an empty file during a single live session, 5825 lines in 6 h 11.
+**https://youtu.be/crEy4UbZ3qs**
 
 <div align="center">
 
-<img src="part-4/captures/jeu-1.png" width="49%" alt="the game running">
-<img src="part-4/captures/jeu-2.png" width="49%" alt="the game running">
-<img src="part-4/captures/jeu-3.png" width="49%" alt="the game running">
-<img src="part-4/captures/jeu-4.png" width="49%" alt="the game running">
+<img src="captures/jeu-1.png" width="49%" alt="the game running">
+<img src="captures/jeu-2.png" width="49%" alt="the game running">
+<img src="captures/jeu-3.png" width="49%" alt="the game running">
+<img src="captures/jeu-4.png" width="49%" alt="the game running">
 
 </div>
 
 ## Running it
 
 ```sh
-cd part-4
 gcc -Wall -Wextra -O2 -Iinclude -o game src/demo.c src/fight.c src/light.c src/main.c src/render.c src/screen.c src/sound.c src/sprite.c src/story.c src/text.c src/texture.c src/thing.c src/trigger.c src/world.c -lX11 -lm && ./game
 ```
 

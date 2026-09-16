@@ -1,0 +1,29 @@
+Tout l'art de ce jeu est fabrique par nous, et rien ici n'a ete telecharge.
+
+Les murs, les sols, les plafonds, les neons, la police de caracteres, la
+carte et les jauges : dessines PAR LE CODE au demarrage du jeu. Il n'en
+existe aucun fichier.
+
+Les six fichiers .tecs de ce dossier sont des planches sculptees puis
+photographiees hors ligne, comme Doom photographiait ses maquettes en latex :
+
+  chose.tecs   64x80,  25 images   cinq angles, quatre pas, et le corps au sol
+  lourd.tecs   72x88,  25 images   la meme sculpture, matiere rouillee
+  boss.tecs    80x96,  25 images   la meme sculpture, matiere de chair
+  homme.tecs   64x80,  25 images   l'equipage : droit, fusil, visiere allumee
+  barre.tecs  240x150,  4 images   la barre d'acier et le gant qui la tient
+  arme.tecs   240x150,  4 images   le pistolet et le gant qui le tient
+
+Les deux dernieres sont photographiees avec le CHAMP DE VISION EXACT du jeu :
+la planche couvre tout le cadre, donc la perspective reste juste a n'importe
+quelle taille de fenetre.
+
+Les outils qui les produisent sont dans le depot, a cote du jeu :
+sculpteur.py (les volumes et le rendu, partages), sculpter-chose.py (les
+trois betes et l'equipage), sculpter-arme.py (ce qu'on tient en main). On les
+regenere avec une commande.
+
+Des planches libres de droits (CC0) d'opengameart.org ont ete essayees au
+debut de la partie 4, puis retirees : elles venaient d'autres jeux, avec
+d'autres contours, d'autres aplats et une autre palette, et ca se voyait
+immediatement a l'ecran. Il ne reste rien d'elles dans ce dossier.
