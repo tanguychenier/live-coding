@@ -12,6 +12,11 @@
 
 #define GLYPH_W    5
 #define GLYPH_H    7
+
+// draws the log in the corner. the line being written is lit and the lines
+// already read are not, and nothing else separates them.
+#define LOG_FRESH  0x9fe8d8
+#define LOG_OLD    0x3d5163
 #define TEXT_SCALE 2           // one font pixel is this many view pixels
 #define TEXT_COLOR 0xe8e4da
 #define TEXT_SHADOW 0x101318
