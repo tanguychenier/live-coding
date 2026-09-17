@@ -1,16 +1,16 @@
 [
   {
     "dossier": "rez-like",
-    "resume": "AXON, a rail shooter drawn in lines of light, in the spirit of Rez, written in C. A wireframe 3D engine, a rail, a tunnel, targets marked up to eight, and a music the program computes, on which every shot plays a note.",
-    "court": "Points in space projected on the screen, lines of light with depth, a rail, and shots that play the music they land on.",
-    "partie": 1,
+    "resume": "AXON, a rail shooter drawn in lines of light, in the spirit of Rez, written in C. The whole game on the engine of part 1, a level in four zones measured in bars of music, a swarm, a HUD drawn in strokes, eight bars of health, a core with four phases, a title screen, a table of the best scores, and a hand of code that plays the game like a person.",
+    "court": "Four zones, a swarm, a core with four phases and an ending, and the game plays itself from the title to the end.",
+    "partie": 2,
     "total": 2,
-    "video": "j4NwurDLC5c",
+    "video": "jfeygQDTY7s",
     "techno": "c",
-    "lignes": 3529,
-    "duree": "7 h 03",
+    "lignes": 6691,
+    "duree": "7 h 31",
     "capture": "jeu-1.png",
-    "chemin_capture": "part-1/captures/jeu-1.png"
+    "chemin_capture": "part-2/captures/jeu-1.png"
   },
   {
     "dossier": "wolfenstein-like",

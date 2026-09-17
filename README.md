@@ -14,13 +14,13 @@ code, no cuts, no second take. The commit lands when the stream ends.
 <tr>
 <td width="50%" valign="top">
 
-<a href="rez-like"><img src="rez-like/part-1/captures/jeu-1.png" width="100%" alt="rez-like"></a>
+<a href="rez-like"><img src="rez-like/part-2/captures/jeu-1.png" width="100%" alt="rez-like"></a>
 
 ### [rez-like](rez-like)
 
-Points in space projected on the screen, lines of light with depth, a rail, and shots that play the music they land on.
+Four zones, a swarm, a core with four phases and an ending, and the game plays itself from the title to the end.
 
-<sub>C and X11 · 3529 lines · written live in 7 h 03 · <a href="https://youtu.be/j4NwurDLC5c">watch it</a></sub>
+<sub>C and X11 · 6691 lines · written live in 7 h 31 · <a href="https://youtu.be/jfeygQDTY7s">watch it</a></sub>
 
 </td>
 <td width="50%" valign="top">
