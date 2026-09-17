@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AXON, part 1 of 2</title>
+<title>AXON</title>
 <style>
   :root { color-scheme: dark; }
   html, body { margin: 0; height: 100%; background: #070a10; color: #e8eef4;
@@ -70,7 +70,7 @@
   <div id="splash">
     <div class="brand" id="brand"></div>
     <div class="line"></div>
-    <div class="title">AXON, PART 1 OF 2</div>
+    <div class="title">AXON</div>
     <div class="hint" id="hint">loading</div>
     <div class="clavier">this game is played with a keyboard and a mouse</div>
     <label class="choix" id="choix-taille">picture
@@ -146,7 +146,7 @@
   var Module = {
     canvas: document.getElementById('canvas'),
     noInitialRun: true,
-    locateFile: function (path) { return path + '?v=0395d0acbb'; },
+    locateFile: function (path) { return path + '?v=807a4ae1e5'; },
     onRuntimeInitialized: function () { ready = true; hint.textContent = 'click, or press enter'; },
     // the game says at what size it draws ("picture: W by H") : shown in the
     // bar, so that a soft picture can be told from a small one
@@ -154,6 +154,6 @@
     printErr: function (t) { console.error(t); },
   };
 </script>
-<script src="axon.js?v=0395d0acbb"></script>
+<script src="axon.js?v=807a4ae1e5"></script>
 </body>
 </html>
