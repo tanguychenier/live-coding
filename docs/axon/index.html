@@ -38,6 +38,21 @@
                   animation: rise 0.6s 1.8s ease-out forwards; }
   #bar { width: 100%; box-sizing: border-box; display: flex; gap: 18px;
          padding: 8px 16px; color: #55677a; font-size: 12px; background: #070a10; }
+  /* a phone : the splash shrinks to the width, the bar wraps, and the game is
+     told that it wants a keyboard */
+  @media (max-width: 640px) {
+    #splash { gap: 12px; padding: 0 16px; text-align: center; }
+    #splash .brand { font-size: 22px; letter-spacing: 0.22em; }
+    #splash select { max-width: 80vw; }
+    #splash .title { font-size: 14px; letter-spacing: 0.12em; }
+    #splash .hint, #splash .choix { font-size: 12px; }
+    #splash .clavier { display: block; color: #8fa3b5; font-size: 12px; opacity: 0;
+                       animation: rise 0.6s 2.0s ease-out forwards; }
+    #bar { flex-wrap: wrap; gap: 8px 14px; font-size: 11px; padding: 8px 12px; }
+    #bar .keys { flex: 1 1 100%; }
+    canvas { width: 100vw !important; }
+  }
+  #splash .clavier { display: none; }
   #bar a { color: #8fa3b5; text-decoration: none; }
   #bar a:hover { color: #6fe0c8; }
   #bar .keys { flex: 1; }
@@ -57,6 +72,7 @@
     <div class="line"></div>
     <div class="title">AXON</div>
     <div class="hint" id="hint">loading</div>
+    <div class="clavier">this game is played with a keyboard and a mouse</div>
     <label class="choix" id="choix-taille">picture
       <select id="taille-choisie">
         <option value="auto">automatic, grows while the machine keeps up</option>

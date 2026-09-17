@@ -27,7 +27,15 @@
   .parties a:hover { color: #6fe0c8; }
   footer { color: #55677a; font-size: 12px; margin-top: 60px; }
   footer a { color: #8fa3b5; text-decoration: none; }
-  @media (max-width: 760px) { .jeu { flex-direction: column; } }
+  @media (max-width: 760px) {
+    .jeu { flex-direction: column; gap: 14px; }
+    .jeu .image { flex: 0 0 auto; width: 100%; }
+    .jeu .image img { width: 100%; }
+    header .brand { font-size: 30px; }
+    main { padding: 28px 16px 60px; }
+  }
+  .liens { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .liens a { margin-right: 0; }
 </style>
 </head>
 <body>
