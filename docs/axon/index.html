@@ -77,11 +77,12 @@
   var Module = {
     canvas: document.getElementById('canvas'),
     noInitialRun: true,
+    locateFile: function (path) { return path + '?v=2261da589f'; },
     onRuntimeInitialized: function () { ready = true; hint.textContent = 'click, or press enter'; },
     print: function (t) { console.log(t); },
     printErr: function (t) { console.error(t); },
   };
 </script>
-<script src="axon.js"></script>
+<script src="axon.js?v=2261da589f"></script>
 </body>
 </html>

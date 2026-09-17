@@ -77,11 +77,12 @@
   var Module = {
     canvas: document.getElementById('canvas'),
     noInitialRun: true,
+    locateFile: function (path) { return path + '?v=1213e156b2'; },
     onRuntimeInitialized: function () { ready = true; hint.textContent = 'click, or press enter'; },
     print: function (t) { console.log(t); },
     printErr: function (t) { console.error(t); },
   };
 </script>
-<script src="keep.js"></script>
+<script src="keep.js?v=1213e156b2"></script>
 </body>
 </html>
