@@ -41,6 +41,7 @@
   #bar a { color: #8fa3b5; text-decoration: none; }
   #bar a:hover { color: #6fe0c8; }
   #bar .keys { flex: 1; }
+  #bar #taille { color: #55677a; margin-left: 14px; }
 </style>
 </head>
 <body>
@@ -58,6 +59,7 @@
     <a href="https://www.youtube.com/playlist?list=PLBPRrs12VQXc">watch it being written</a>
     <a href="https://github.com/tanguychenier/live-coding/tree/main/wolfenstein-like">source</a>
     <a href="../">all the games</a>
+    <span id="taille"></span>
   </div>
 </div>
 <script>
@@ -100,7 +102,9 @@
     noInitialRun: true,
     locateFile: function (path) { return path + '?v=1213e156b2'; },
     onRuntimeInitialized: function () { ready = true; hint.textContent = 'click, or press enter'; },
-    print: function (t) { console.log(t); },
+    // the game says at what size it draws ("picture: W by H") : shown in the
+    // bar, so that a soft picture can be told from a small one
+    print: function (t) { console.log(t); const m = /^picture: (\d+) by (\d+)/.exec(t); if (m) { const e = document.getElementById('taille'); if (e) e.textContent = 'drawn at ' + m[1] + ' by ' + m[2]; } },
     printErr: function (t) { console.error(t); },
   };
 </script>
