@@ -110,7 +110,8 @@
     // the game opens full screen, from the click or the key that starts it,
     // the only moment a browser allows it. escape gives the page back, the
     // game keeps running, and a click on the canvas goes full screen again
-    const plein = () => { const p = document.documentElement.requestFullscreen; if (p) p.call(document.documentElement).catch(() => {}); };
+    // safari names it with a prefix on older versions
+    const plein = () => { const e = document.documentElement; const p = e.requestFullscreen || e.webkitRequestFullscreen; if (p) { try { const r = p.call(e); if (r && r.catch) r.catch(() => {}); } catch (err) {} } };
     plein();
     document.getElementById('canvas').addEventListener('click', () => { if (!document.fullscreenElement) plein(); });
     Module.callMain([]);
