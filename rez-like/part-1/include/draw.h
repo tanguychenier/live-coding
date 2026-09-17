@@ -36,6 +36,14 @@ struct camera {
 // the soft shoulder of the tone curve. light past one goes white gently
 #define TONE_KNEE      1.6
 
+// the bloom, how much of the blurred picture is added back, and how much more
+// on the beat
+#define BLOOM_AMOUNT   0.9
+#define BLOOM_PULSE    0.5
+// the blur works on a picture this many times smaller at the base size,
+// and as many times more on a bigger picture, so the glow keeps its reach
+#define BLOOM_DOWN     4
+
 // a colour in floating point, so that light can add up past white before
 // it is clamped
 struct light {

@@ -7,16 +7,35 @@
 unsigned int *view;
 int view_width, view_height;
 
+// the loops over a row go by blocks of eight pixels, a constant, which lets
+// the compiler turn a block into two wide instructions with no tail. the
+// arrays are padded for the last block, and a row is never wider than this
+#define BLOCK    8
+#define ROW_MAX  4096
+
+static int blocks_of(int width)
+{
+	return (width + BLOCK - 1) / BLOCK;
+}
+
 // light adds up in these, one per channel, nothing clamped before the end
 // of the frame. a hundred faint lines crossing make a bright spot, the way
 // real light does
 static float *red, *green, *blue;
+// the bloom works on a picture shrunk by this much, and its taps
+static int bloom_down = BLOOM_DOWN;
+static int small_width, small_height;
+static float *small[3], *blurred[3], *tmp[3];
+static float *wide[3];
+static int *blur_x0, *blur_x1, *blur_y0, *blur_y1;
+static float *blur_fx, *blur_fy;
 // how much bigger than the base size the picture is
 static double scale_up = 1.0;
 // once the frame is finished, what is drawn goes straight into the picture,
 // sharp, without the bloom. that is how the numbers stay readable
 static int finished;
 static double fog_depth = 38.0;
+static double pulse;
 
 struct light light_hue(double hue)
 {
@@ -39,7 +58,27 @@ double draw_scale(void)
 	return scale_up;
 }
 
-// the picture, as big as the window, made anew when the window changes
+// the small blurred picture is stretched back in two steps, along the rows
+// into a wide strip, then down the columns, each pixel a mix of its two
+// neighbours. the weights are the same for every row, computed once
+static void make_blur_taps(void)
+{
+	for (int x = 0; x < view_width; x++) {
+		double u = (double)x / bloom_down - 0.5;
+		int x0 = (int)floor(u);
+		blur_fx[x] = (float)(u - x0);
+		blur_x0[x] = x0 < 0 ? 0 : x0;
+		blur_x1[x] = x0 + 1 >= small_width ? small_width - 1 : x0 + 1;
+	}
+	for (int y = 0; y < view_height; y++) {
+		double v = (double)y / bloom_down - 0.5;
+		int y0 = (int)floor(v);
+		blur_fy[y] = (float)(v - y0);
+		blur_y0[y] = y0 < 0 ? 0 : y0;
+		blur_y1[y] = y0 + 1 >= small_height ? small_height - 1 : y0 + 1;
+	}
+}
+
 int draw_resize(int width, int height)
 {
 	if (width == view_width && height == view_height && view)
@@ -48,15 +87,46 @@ int draw_resize(int width, int height)
 	free(red);
 	free(green);
 	free(blue);
+	free(blur_x0);
+	free(blur_fx);
+	for (int ch = 0; ch < 3; ch++) {
+		free(small[ch]);
+		free(blurred[ch]);
+		free(tmp[ch]);
+		free(wide[ch]);
+	}
 	view_width = width;
 	view_height = height;
 	scale_up = (double)height / VIEW_BASE_HEIGHT;
-	size_t pixels = (size_t)width * height;
+	bloom_down = (int)floor(BLOOM_DOWN * scale_up + 0.5);
+	if (bloom_down < 1)
+		bloom_down = 1;
+	small_width = width / bloom_down;
+	small_height = height / bloom_down;
+	// a block of pixels past the end of every row, for the loops that go
+	// by blocks
+	size_t pixels = (size_t)width * height + BLOCK, smalls = (size_t)small_width * small_height;
 	view = calloc(pixels, sizeof *view);
 	red = calloc(pixels, sizeof *red);
 	green = calloc(pixels, sizeof *green);
 	blue = calloc(pixels, sizeof *blue);
-	return view && red && green && blue;
+	blur_x0 = calloc((size_t)width * 2 + (size_t)height * 2 + 2 * BLOCK, sizeof *blur_x0);
+	blur_fx = calloc((size_t)width + height + BLOCK, sizeof *blur_fx);
+	for (int ch = 0; ch < 3; ch++) {
+		small[ch] = calloc(smalls, sizeof *small[ch]);
+		blurred[ch] = calloc(smalls, sizeof *blurred[ch]);
+		tmp[ch] = calloc(smalls, sizeof *tmp[ch]);
+		wide[ch] = calloc((size_t)small_height * width + BLOCK, sizeof *wide[ch]);
+	}
+	if (!view || !red || !green || !blue || !blur_x0 || !blur_fx
+	    || !small[2] || !blurred[2] || !tmp[2] || !wide[2])
+		return 0;
+	blur_x1 = blur_x0 + width + BLOCK;
+	blur_y0 = blur_x1 + width + BLOCK;
+	blur_y1 = blur_y0 + height;
+	blur_fy = blur_fx + width + BLOCK;
+	make_blur_taps();
+	return 1;
 }
 
 // the frame starts dark, and the sky, a gradient from top to bottom, is
@@ -312,6 +382,80 @@ void draw_point(const struct camera *cam, struct vec point, struct light colour,
 		}
 }
 
+// the bloom. the picture is shrunk, blurred three times and added back on
+// top of itself, and a wireframe starts to look like neon. five taps along
+// the rows then down the columns, the edges done apart, no test in the middle
+#define BLUR_TAPS  5
+#define BLUR_EDGE  (BLUR_TAPS / 2)
+static const float BLUR_WEIGHT[BLUR_TAPS] = { 1 / 16.f, 4 / 16.f, 6 / 16.f, 4 / 16.f, 1 / 16.f };
+
+static float blur_at(const float *in, int width, int height, int x, int y)
+{
+	x = x < 0 ? 0 : x >= width ? width - 1 : x;
+	y = y < 0 ? 0 : y >= height ? height - 1 : y;
+	return in[y * width + x];
+}
+
+static void blur_pass(float *in, float *out, float *scratch)
+{
+	int width = small_width, height = small_height;
+	for (int y = 0; y < height; y++) {
+		const float *row = in + y * width;
+		float *dst = scratch + y * width;
+		for (int x = BLUR_EDGE; x < width - BLUR_EDGE; x++)
+			dst[x] = row[x - 2] * BLUR_WEIGHT[0] + row[x - 1] * BLUR_WEIGHT[1]
+				+ row[x] * BLUR_WEIGHT[2] + row[x + 1] * BLUR_WEIGHT[3]
+				+ row[x + 2] * BLUR_WEIGHT[4];
+		for (int x = 0; x < width; x += width - 1 - BLUR_EDGE) {
+			for (int e = x; e < x + BLUR_EDGE; e++) {
+				float sum = 0;
+				for (int k = -BLUR_EDGE; k <= BLUR_EDGE; k++)
+					sum += blur_at(in, width, height, e + k, y) * BLUR_WEIGHT[k + BLUR_EDGE];
+				dst[e] = sum;
+			}
+		}
+	}
+	for (int y = BLUR_EDGE; y < height - BLUR_EDGE; y++) {
+		float *dst = out + y * width;
+		const float *r0 = scratch + (y - 2) * width, *r1 = scratch + (y - 1) * width;
+		const float *r2 = scratch + y * width, *r3 = scratch + (y + 1) * width;
+		const float *r4 = scratch + (y + 2) * width;
+		for (int x = 0; x < width; x++)
+			dst[x] = r0[x] * BLUR_WEIGHT[0] + r1[x] * BLUR_WEIGHT[1] + r2[x] * BLUR_WEIGHT[2]
+				+ r3[x] * BLUR_WEIGHT[3] + r4[x] * BLUR_WEIGHT[4];
+	}
+	for (int y = 0; y < height; y += height - 1 - BLUR_EDGE)
+		for (int e = y; e < y + BLUR_EDGE; e++)
+			for (int x = 0; x < width; x++) {
+				float sum = 0;
+				for (int k = -BLUR_EDGE; k <= BLUR_EDGE; k++)
+					sum += blur_at(scratch, width, height, x, e + k) * BLUR_WEIGHT[k + BLUR_EDGE];
+				out[e * width + x] = sum;
+			}
+}
+
+// the rows of a block added into one, half of the shrink. a plain loop
+// over blocks, so that it runs wide
+static void add_row(float *restrict acc, const float *restrict src, int blocks)
+{
+	for (int b = 0; b < blocks; b++)
+		for (int k = b * BLOCK; k < b * BLOCK + BLOCK; k++)
+			acc[k] += src[k];
+}
+
+// the channels blurred at the end of a frame for the next one. the glow
+// trails the picture by a frame, which no eye can tell, and the planes are
+// read once per frame instead of twice
+static void blur_channel(int first, int last, void *data)
+{
+	(void)data;
+	for (int ch = first; ch < last; ch++) {
+		blur_pass(small[ch], blurred[ch], tmp[ch]);
+		blur_pass(blurred[ch], small[ch], tmp[ch]);
+		blur_pass(small[ch], blurred[ch], tmp[ch]);
+	}
+}
+
 // a soft shoulder instead of a hard clamp, one minus exp of minus the
 // light. the exp is one over its own series, four terms, close enough on
 // this side of white, and it lets the compiler do eight pixels at a time
@@ -322,20 +466,108 @@ static inline float tone(float x)
 	return 255.0f * (1.0f - 1.0f / sum);
 }
 
-// the light of each pixel, with the sky under it, goes through the tone
-// curve into a byte per channel, and the planes are emptied on the way
+// the glow of each channel is stretched along into its strip, the three
+// channels side by side
+static void stretch_row(float *restrict dst, const float *restrict row, int blocks)
+{
+	for (int b = 0; b < blocks; b++)
+		for (int k = b * BLOCK; k < b * BLOCK + BLOCK; k++)
+			dst[k] = row[blur_x0[k]] + (row[blur_x1[k]] - row[blur_x0[k]]) * blur_fx[k];
+}
+
+static void blur_and_stretch(int first, int last, void *data)
+{
+	blur_channel(first, last, data);
+	for (int ch = first; ch < last; ch++)
+		for (int y = 0; y < small_height; y++)
+			stretch_row(wide[ch] + (size_t)y * view_width, blurred[ch] + y * small_width,
+				    blocks_of(view_width));
+}
+
+// the pieces of a row, each a plain loop over arrays that the compiler is
+// told do not overlap, so that it can run them eight pixels at a time
+static void mix_row(float *restrict dst, const float *restrict src,
+		    const float *restrict above, const float *restrict below,
+		    float fy, float amount, float base, int blocks)
+{
+	for (int b = 0; b < blocks; b++)
+		for (int k = b * BLOCK; k < b * BLOCK + BLOCK; k++)
+			dst[k] = src[k] + amount * (above[k] + (below[k] - above[k]) * fy) + base;
+}
+
+static void tone_row(int *restrict out, const float *restrict in, int blocks)
+{
+	for (int b = 0; b < blocks; b++)
+		for (int k = b * BLOCK; k < b * BLOCK + BLOCK; k++)
+			out[k] = (int)tone(in[k] * (float)TONE_KNEE);
+}
+
+static void pack_row(unsigned int *restrict out, const int *restrict r, const int *restrict g,
+		     const int *restrict b, int blocks)
+{
+	for (int block = 0; block < blocks; block++)
+		for (int k = block * BLOCK; k < block * BLOCK + BLOCK; k++)
+			out[k] = ((unsigned int)r[k] << 16) | ((unsigned int)g[k] << 8) | (unsigned int)b[k];
+}
+
+// a row is finished in one pass, glow and sky added, tone curve, pack. the rows go by bands of one small pixel's height, and each band is
+// added up into the small picture of the next frame's glow on the way
+struct finish_job {
+	float amount;
+};
+
+static void finish_bands(int first, int last, void *data)
+{
+	const struct finish_job *job = data;
+	float *plane[3] = { red, green, blue };
+	static _Thread_local float value[ROW_MAX + BLOCK];
+	static _Thread_local float acc[3][ROW_MAX + BLOCK];
+	static _Thread_local int byte[3][ROW_MAX + BLOCK];
+	int width = view_width < ROW_MAX ? view_width : ROW_MAX;
+	int blocks = blocks_of(width);
+	float share = 1.0f / (float)(bloom_down * bloom_down);
+	for (int band = first; band < last; band++) {
+		memset(acc, 0, sizeof acc);
+		int y0 = band * bloom_down, y1 = y0 + bloom_down;
+		if (y1 > view_height)
+			y1 = view_height;
+		for (int y = y0; y < y1; y++) {
+			struct light sky = light_mix(sky_top, sky_bottom, (double)y / view_height);
+			float base[3] = { (float)sky.r, (float)sky.g, (float)sky.b };
+			size_t row = (size_t)y * view_width;
+			for (int ch = 0; ch < 3; ch++) {
+				float *src = plane[ch] + row;
+				add_row(acc[ch], src, blocks);
+				// the sky is never negative, nor the light, so what reaches
+				// the tone curve is never negative either
+				mix_row(value, src, wide[ch] + (size_t)blur_y0[y] * view_width,
+					wide[ch] + (size_t)blur_y1[y] * view_width, blur_fy[y],
+					job->amount, base[ch], blocks);
+				tone_row(byte[ch], value, blocks);
+				// the row is emptied for the next frame while it is still here
+				memset(src, 0, (size_t)width * sizeof *src);
+			}
+			pack_row(view + row, byte[0], byte[1], byte[2], blocks);
+		}
+		// the band, shrunk to one row of the small picture
+		if (band < small_height)
+			for (int ch = 0; ch < 3; ch++)
+				for (int x = 0; x < small_width; x++) {
+					float sum = 0;
+					for (int dx = 0; dx < bloom_down; dx++)
+						sum += acc[ch][x * bloom_down + dx];
+					small[ch][band * small_width + x] = sum * share;
+				}
+	}
+}
+
 void draw_finish(void)
 {
-	for (int y = 0; y < view_height; y++) {
-		struct light sky = light_mix(sky_top, sky_bottom, (double)y / view_height);
-		size_t row = (size_t)y * view_width;
-		for (int x = 0; x < view_width; x++) {
-			size_t i = row + x;
-			view[i] = rgb((int)tone((red[i] + (float)sky.r) * (float)TONE_KNEE),
-				      (int)tone((green[i] + (float)sky.g) * (float)TONE_KNEE),
-				      (int)tone((blue[i] + (float)sky.b) * (float)TONE_KNEE));
-			red[i] = green[i] = blue[i] = 0.0f;
-		}
-	}
+	// a line covers less of a bigger block, so the glow of a bigger picture
+	// is scaled back up by the block, to keep the same neon
+	struct finish_job job = {
+		(float)(BLOOM_AMOUNT * (1.0 + BLOOM_PULSE * pulse) * bloom_down / BLOOM_DOWN) };
+	finish_bands(0, (view_height + bloom_down - 1) / bloom_down, &job);
+	blur_and_stretch(0, 3, NULL);
 	finished = 1;
 }
