@@ -11,6 +11,7 @@
 
 #include "demo.h"
 #include "draw.h"
+#include "font.h"
 #include "hero.h"
 #include "level.h"
 #include "palette.h"
@@ -38,12 +39,37 @@
 // easing back over this long
 #define PUNCH_ZOOM       0.2
 #define PUNCH_TIME       0.45
+// the name of a zone stays big in the middle this long
+#define ZONE_TITLE_TIME  3.0
+#define ZONE_TITLE_SIZE  8.0
+// the first seconds say what the hands do, and the words fade over the last
+#define LESSON_TIME      9.0
+#define LESSON_FADE      1.0
 // the groove of the tunnel builds up, the bass from this bar, the hats
 // from this one at half, then whole from this one
 #define UPLINK_BASS_BAR  4.0
 #define UPLINK_HAT_BAR   8.0
 #define UPLINK_HAT_HALF  0.4
 #define UPLINK_HAT_FULL_BAR 32.0
+// where the numbers sit
+#define HUD_MARGIN       14.0
+#define HUD_TEXT_MAX     64       // a line of the numbers, at most
+#define HUD_SCORE_SIZE   4.0
+#define HUD_ZONE_SIZE    2.5
+#define HUD_CHAIN_SIZE   4.0
+#define HUD_CHAIN_GROW   2.0      // the chain is this much bigger the instant it lands
+#define HUD_HEALTH_STEP  22.0
+#define HUD_HEALTH_WIDE  16.0
+#define HUD_LESSON_Y     64.0     // the two lines of the lesson, under the score
+#define HUD_GLOW         0.6      // the numbers also go in the light, this much
+#define HUD_BLINK        2.0      // blinks per second of the press enter line
+#define HUD_BLINK_ON     0.6      // and how much of each blink is on
+// where the big lines sit, as fractions of the height, and how far apart
+#define TITLE_Y          0.3
+#define LINE_GAP         34.0
+#define BIG_SIZE         6.0
+#define MID_SIZE         4.0
+#define SMALL_SIZE       3.0
 
 struct game {
 	struct rail rail;
@@ -159,6 +185,63 @@ static void step_play(struct game *game, const struct keys *keys, double elapsed
 	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y,
 		    game->player.released, hurt, elapsed, now);
 	particles_update(elapsed);
+	if (!game->player.alive)
+		things_scatter();
+}
+
+// the numbers are laid out in base pixels and scaled to the picture
+static double px(double base)
+{
+	return base * draw_scale();
+}
+
+static void write_centered(double y, const char *text, double size, struct light colour)
+{
+	font_write((view_width - font_width(text, size)) / 2.0, y, text, size, colour);
+}
+
+// the numbers along the top, the health along the bottom. drawn twice, once
+// in the light so that they glow, once sharp so that they read
+static void draw_hud(const struct game *game, double now, double gain)
+{
+	const struct player *player = &game->player;
+	char text[HUD_TEXT_MAX];
+	snprintf(text, sizeof text, "%08ld", player->score);
+	font_write(px(HUD_MARGIN), px(HUD_MARGIN - 2), text, px(HUD_SCORE_SIZE),
+		   light_scale(LIGHT_HUD, gain));
+	font_write(px(HUD_MARGIN), px(HUD_MARGIN + 26), palette_of(game->zone)->name,
+		   px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD_DIM, gain));
+	// the chain, big, for a moment after a release
+	if (player->chain > 1 && now - player->chain_at < CHAIN_SHOW) {
+		double fade = 1.0 - (now - player->chain_at) / CHAIN_SHOW;
+		snprintf(text, sizeof text, "X%d", player->chain);
+		double size = px(HUD_CHAIN_SIZE + HUD_CHAIN_GROW * fade);
+		font_write(view_width - px(HUD_MARGIN) - font_width(text, size), px(HUD_MARGIN - 2),
+			   text, size, light_scale(light_mix(LIGHT_HUD_DIM, LIGHT_CHAIN, fade), gain));
+	}
+	// health, eight bars along the bottom, the lost ones left dark
+	for (int i = 0; i < HEALTH_MAX; i++) {
+		double x = px(HUD_MARGIN + i * HUD_HEALTH_STEP);
+		double y = view_height - px(HUD_MARGIN);
+		struct light lit = light_scale(i < player->health ? LIGHT_HUD : LIGHT_HUD_OFF, gain);
+		draw_line_2d(x, y, x + px(HUD_HEALTH_WIDE), y, lit);
+		draw_line_2d(x, y + px(2), x + px(HUD_HEALTH_WIDE), y + px(2), lit);
+	}
+	// the name of the zone, big, when it starts
+	double title = 1.0 - (now - game->zone_at) / ZONE_TITLE_TIME;
+	if (title > 0.0) {
+		double fade = sin(title * M_PI);
+		write_centered(view_height * TITLE_Y, palette_of(game->zone)->name, px(ZONE_TITLE_SIZE),
+			       light_scale(LIGHT_HUD, gain * fade));
+	}
+	// the first seconds say what the hands do
+	if (now < LESSON_TIME) {
+		double fade = fmin(1.0, (LESSON_TIME - now) / LESSON_FADE);
+		write_centered(px(HUD_LESSON_Y), "ARROWS OR MOUSE MOVE THE SIGHT", px(HUD_ZONE_SIZE),
+			       light_scale(LIGHT_HUD_DIM, gain * fade));
+		write_centered(px(HUD_LESSON_Y + 16), "HOLD SPACE OR CLICK TO MARK   LET GO TO FIRE",
+			       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD_DIM, gain * fade));
+	}
 }
 
 static void draw_frame(struct game *game, double now)
@@ -172,7 +255,9 @@ static void draw_frame(struct game *game, double now)
 	particles_draw(&game->camera);
 	hero_draw(&game->hero, &game->camera, now);
 	player_draw(&game->player, &game->camera, now);
+	draw_hud(game, now, HUD_GLOW);
 	draw_finish();
+	draw_hud(game, now, 1.0);
 }
 
 int main(void)
@@ -215,8 +300,8 @@ int main(void)
 		screen_present(&screen);
 		if (trace && moment - traced_at > 0.5) {
 			traced_at = moment;
-			fprintf(stderr, "t %.1f zone %d eye %.2f things %d score %ld\n",
-				now, game->zone, game->t_eye, things_count(), game->player.score);
+			fprintf(stderr, "t %.1f zone %d eye %.2f things %d score %ld health %d\n",
+				now, game->zone, game->t_eye, things_count(), game->player.score, game->player.health);
 		}
 		double spent = now_in_seconds() - moment;
 		if (spent < FRAME_SECONDS)

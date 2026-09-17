@@ -1,6 +1,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "font.h"
 #include "level.h"
 #include "palette.h"
 #include "particle.h"
@@ -13,6 +14,8 @@ void player_reset(struct player *player)
 	memset(player, 0, sizeof *player);
 	player->cursor_x = view_width / 2.0;
 	player->cursor_y = view_height / 2.0;
+	player->health = HEALTH_MAX;
+	player->alive = 1;
 }
 
 static int already_locked(const struct player *player, unsigned int serial)
@@ -52,7 +55,7 @@ static void mark(struct player *player, const struct camera *cam, double now)
 	for (int i = 0; i < THINGS_MAX && player->locks < LOCKS_MAX; i++) {
 		const struct thing *thing = &things[i];
 		double x, y;
-		if (!thing->used || already_locked(player, thing->serial))
+		if (!thing->used || thing->shielded || already_locked(player, thing->serial))
 			continue;
 		if (!thing_on_screen(cam, thing, &x, &y))
 			continue;
@@ -93,6 +96,9 @@ static void release(struct player *player, double now)
 		player->released_at = now;
 		player->released = 1;
 		player->released_full = player->locks == LOCKS_MAX;
+		// a full chain gives back a point of health, mastery is rewarded
+		if (player->released_full && player->health < HEALTH_MAX)
+			player->health++;
 		if (player->chain > player->best_chain)
 			player->best_chain = player->chain;
 	}
@@ -113,12 +119,22 @@ static struct vec shot_at(const struct shot *shot, const struct thing *thing, do
 
 static void land(struct player *player, struct shot *shot, struct thing *thing, double now)
 {
-	if (thing_hurt(thing, now)) {
+	int was_gate = thing->motion == MOTION_GATE;
+	int worth = thing_hurt(thing, now);
+	if (worth > 0) {
 		player->kills++;
 		// the score rewards the chain, eight at once are worth far more
 		// than eight one by one
-		player->score += (long)SCORE_KILL * player->chain * player->chain;
+		player->score += (long)SCORE_KILL * player->chain * player->chain * worth;
 		sound_hit(HIT_KILL, shot->note, shot->land);
+		if (was_gate) {
+			// a gate gives back a point of health, it is the breath of
+			// the level
+			player->score += SCORE_GATE;
+			sound_hit(HIT_GATE, 0, shot->land);
+			if (player->health < HEALTH_MAX)
+				player->health++;
+		}
 	} else {
 		sound_hit(HIT_LOCK, shot->note, shot->land);
 	}
@@ -150,10 +166,24 @@ static void fly_shots(struct player *player, struct vec from, double now)
 	}
 }
 
+int player_hurt(struct player *player, int count, double now)
+{
+	if (count <= 0 || now - player->hurt_at < HURT_GRACE)
+		return 0;
+	player->hurt_at = now;
+	player->health -= THING_DAMAGE;
+	sound_hit(HIT_HURT, 0, sound_next_step(now));
+	if (player->health <= 0) {
+		player->health = 0;
+		player->alive = 0;
+	}
+	return 1;
+}
+
 void player_update(struct player *player, const struct keys *keys, double elapsed)
 {
 	move_cursor(player, keys, elapsed);
-	player->holding = keys->fire || keys->mouse_down;
+	player->holding = player->alive && (keys->fire || keys->mouse_down);
 }
 
 // fire held, the sight marks, fire let go, the shots leave, and the shots in
@@ -210,13 +240,19 @@ static void draw_cursor(const struct player *player, const struct camera *cam, d
 			continue;
 		double size = (BRACKET_SIZE + BRACKET_SWING * sin(now * BRACKET_RATE + i)) * px;
 		double arm = size * BRACKET_ARM;
-		// four corners, each an angle of two short arms
-		for (int corner = 0; corner < 4; corner++) {
-			double sx = corner % 2 ? 1.0 : -1.0, sy = corner / 2 ? 1.0 : -1.0;
-			double cx = tx + sx * size, cy = ty + sy * size;
-			draw_line_2d(cx, cy, cx - sx * (size - arm), cy, LIGHT_LOCK);
-			draw_line_2d(cx, cy, cx, cy - sy * (size - arm), LIGHT_LOCK);
-		}
+		struct light mark_light = LIGHT_LOCK;
+		draw_line_2d(tx - size, ty - size, tx - arm, ty - size, mark_light);
+		draw_line_2d(tx - size, ty - size, tx - size, ty - arm, mark_light);
+		draw_line_2d(tx + size, ty - size, tx + arm, ty - size, mark_light);
+		draw_line_2d(tx + size, ty - size, tx + size, ty - arm, mark_light);
+		draw_line_2d(tx - size, ty + size, tx - arm, ty + size, mark_light);
+		draw_line_2d(tx - size, ty + size, tx - size, ty + arm, mark_light);
+		draw_line_2d(tx + size, ty + size, tx + arm, ty + size, mark_light);
+		draw_line_2d(tx + size, ty + size, tx + size, ty + arm, mark_light);
+		// the number of the lock, small, above the bracket
+		char digit[2] = { (char)('1' + i), 0 };
+		font_write(tx + size + LOCK_DIGIT_GAP * px, ty - size - LOCK_DIGIT_UP * px, digit,
+			   LOCK_DIGIT_SIZE * px, mark_light);
 	}
 }
 

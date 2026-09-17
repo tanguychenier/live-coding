@@ -16,6 +16,10 @@
 // sixteenths after it leaves
 #define SHOT_FLIGHT_STEPS 2
 #define SHOTS_MAX        32
+#define HEALTH_MAX       8
+// after a hit, no other hit counts for this long. a ring of eight drones
+// must not empty the whole health at once
+#define HURT_GRACE       0.7
 // how fast the cursor moves with the keys, in pixels per second
 #define CURSOR_SPEED     520.0
 // a kill is worth this, times the chain squared. eight at once is sixty
@@ -30,6 +34,11 @@
 #define SHOT_TRAIL_STEPS 10
 #define SHOT_TRAIL_DIM   0.15
 #define SHOT_HEAD_SIZE   0.14
+// the number of a lock is written this big, in pixels per glyph unit, this
+// far right of the bracket and this far above it
+#define LOCK_DIGIT_SIZE  2.0
+#define LOCK_DIGIT_GAP   3.0
+#define LOCK_DIGIT_UP    8.0
 // the ring of the sight, this much of the lock radius at rest, swelling by
 // this much this fast while it marks
 #define CURSOR_REST      0.7
@@ -64,14 +73,17 @@ struct player {
 	int holding;                 // fire is down
 	int was_holding;             // and it was last frame, a release is the edge
 	struct shot shots[SHOTS_MAX];
+	int health;
 	long score;
 	int chain;                   // the last release, how many at once
 	double chain_at;
 	int best_chain;
 	int kills;
+	double hurt_at;
 	double released_at;          // the last release, for the pilot's arms
 	int released;                // a chain just left, this frame
 	int released_full;           // and it was a chain of eight, for the camera
+	int alive;
 };
 
 void player_reset(struct player *player);
@@ -80,6 +92,8 @@ void player_update(struct player *player, const struct keys *keys, double elapse
 // marks targets while fire is held, releases the shots when it is let go,
 // and flies them. from is where the shots leave
 void player_aim(struct player *player, const struct camera *cam, struct vec from, double now);
+// a hit taken. returns 1 if it counted, 0 if the grace held
+int player_hurt(struct player *player, int count, double now);
 void player_draw(const struct player *player, const struct camera *cam, double now);
 
 #endif
