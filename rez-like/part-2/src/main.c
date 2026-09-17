@@ -21,6 +21,7 @@
 #include "sound.h"
 #include "thing.h"
 #include "tunnel.h"
+#include "world.h"
 
 #define GAME_NAME        "AXON"
 // the eye looks this far ahead of itself along the rail
@@ -166,7 +167,7 @@ static void draw_frame(struct game *game, double now)
 	draw_clear(pal->sky_top, pal->sky_bottom);
 	draw_fog(pal->fog);
 	draw_pulse(exp(-sound_beat_phase(now) * BEAT_DECAY));
-	tunnel_draw(&game->camera, &game->rail, game->t_eye, now, pal);
+	world_draw(&game->camera, &game->rail, game->t_eye, now, game->zone, pal);
 	things_draw(&game->camera, now);
 	particles_draw(&game->camera);
 	hero_draw(&game->hero, &game->camera, now);

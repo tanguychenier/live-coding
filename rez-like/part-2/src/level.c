@@ -4,6 +4,7 @@
 #include "level.h"
 #include "sound.h"
 #include "thing.h"
+#include "world.h"
 
 static const int BARS[ZONES] = { UPLINK_BARS, FIELD_BARS, SWARM_BARS, APPROACH_BARS };
 static const double WAVE_BEATS[ZONES] = { UPLINK_WAVE_BEATS, FIELD_WAVE_BEATS,
@@ -134,6 +135,7 @@ void level_build_rail(struct rail *rail)
 	for (int i = (int)rail->zone_start[ZONE_FIELD]; i < (int)rail->zone_start[ZONE_FIELD + 1]; i++)
 		if (rail->point[i].y < lowest)
 			lowest = rail->point[i].y;
+	world_set_floor(lowest - PLAIN_LOWEST);
 }
 
 // past the end the level is flown again from its start
