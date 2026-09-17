@@ -86,6 +86,7 @@
 #define SIGNATURE_SIZE   2.0
 #define SIGNATURE_AFTER  1.0
 #define SIGNATURE_DRAW   1.2
+#define TITLE_PRESS_UP   92.0     // the press any key line, this far above the bottom
 // the table of the best runs on the title, at the left, where it starts,
 // its lines, and where the pilot floats meanwhile, to the right of it
 #define TABLE_X          22.0
@@ -105,6 +106,9 @@
 #define LAUNCH_WIDE      0.7
 #define LAUNCH_SIGNAL_SPEED 2.5
 #define LAUNCH_SIGNAL_REACH 8.0
+// the debug rendering writes this many seconds of the mix
+#define WAV_SECONDS      20.0
+#define WAV_HEADER       44
 // where the numbers sit
 #define HUD_MARGIN       14.0
 #define HUD_SCORE_SIZE   4.0
@@ -147,7 +151,9 @@ struct game {
 	double roll;
 	double punch_at;
 	double flash_at;
+	int cabinet;             // the game is playing itself
 	int fire_let_go;         // on the death screen, fire has been let go since the death
+	double cabinet_at;
 	long final_score;
 	int final_chain;
 	double launch_until;     // when the drop comes, on the run clock
@@ -202,6 +208,7 @@ static void begin_title(struct game *game)
 	begin_run(game, 0.0, 0);
 	game->state = STATE_TITLE;
 	game->state_at = sound_now();
+	game->cabinet = 0;
 }
 
 // where the title stands in the world, its top left corner and its axes
@@ -457,6 +464,53 @@ static void step_launch(struct game *game, double elapsed, double now)
 	}
 }
 
+// twenty seconds of the mix, the game playing itself, written as a wav file
+// with no card and no window. the clock is pulled frame by frame
+static int render_wav(struct game *game, const char *path, double start_at)
+{
+	FILE *f = fopen(path, "wb");
+	if (!f) {
+		fprintf(stderr, "cannot write %s\n", path);
+		return 1;
+	}
+	int frames_per_step = (int)(SOUND_RATE * FRAME_SECONDS);
+	int total = (int)(WAV_SECONDS * SOUND_RATE);
+	short *mix = calloc((size_t)total * 2, sizeof *mix);
+	if (!mix)
+		return 1;
+	struct keys keys = { 0 };
+	game->cabinet = 1;
+	int done = 0;
+	while (done < total) {
+		double now = sound_now();
+		demo_drive(&game->player, &game->camera, &keys, now, game->zone, &game->boss);
+		if (game->state == STATE_PLAY)
+			step_play(game, &keys, FRAME_SECONDS, now);
+		else
+			begin_run(game, start_at, 0);
+		set_layers(game, now);
+		int frames = frames_per_step;
+		if (done + frames > total)
+			frames = total - done;
+		sound_render(mix + (size_t)done * 2, frames);
+		done += frames;
+	}
+	// the header of a wav, forty four bytes of sizes and formats
+	unsigned int data_bytes = (unsigned int)total * 4;
+	unsigned int rate = SOUND_RATE, byte_rate = SOUND_RATE * 4;
+	unsigned short channels = 2, align = 4, bits = 16, pcm = 1;
+	unsigned int riff_size = WAV_HEADER - 8 + data_bytes, fmt_size = 16;
+	fwrite("RIFF", 1, 4, f); fwrite(&riff_size, 4, 1, f); fwrite("WAVE", 1, 4, f);
+	fwrite("fmt ", 1, 4, f); fwrite(&fmt_size, 4, 1, f); fwrite(&pcm, 2, 1, f);
+	fwrite(&channels, 2, 1, f); fwrite(&rate, 4, 1, f); fwrite(&byte_rate, 4, 1, f);
+	fwrite(&align, 2, 1, f); fwrite(&bits, 2, 1, f);
+	fwrite("data", 1, 4, f); fwrite(&data_bytes, 4, 1, f);
+	fwrite(mix, 4, (size_t)total, f);
+	fclose(f);
+	free(mix);
+	return 0;
+}
+
 // the numbers are laid out in base pixels and scaled to the picture
 static double px(double base)
 {
@@ -496,7 +550,7 @@ static void draw_hud(const struct game *game, double now, double gain)
 	char text[SCORES_LINE];
 	int blink = fmod(now * HUD_BLINK, 1.0) < HUD_BLINK_ON;
 	if (game->state == STATE_TITLE) {
-		if (blink)
+		if (blink && !game->cabinet)
 			write_centered(view_height * TITLE_PRESS_Y, "PRESS ENTER TO START",
 				       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD, gain));
 		draw_table(gain);
@@ -566,13 +620,16 @@ static void draw_hud(const struct game *game, double now, double gain)
 			       light_scale(LIGHT_HUD, gain * fade));
 	}
 	// the first seconds say what the hands do
-	if (game->state == STATE_PLAY && now < LESSON_TIME && game->titled) {
+	if (game->state == STATE_PLAY && now < LESSON_TIME && !game->cabinet && game->titled) {
 		double fade = fmin(1.0, (LESSON_TIME - now) / LESSON_FADE);
 		write_centered(px(HUD_LESSON_Y), "ARROWS OR MOUSE MOVE THE SIGHT", px(HUD_ZONE_SIZE),
 			       light_scale(LIGHT_HUD_DIM, gain * fade));
 		write_centered(px(HUD_LESSON_Y + 16), "HOLD SPACE OR CLICK TO MARK   LET GO TO FIRE",
 			       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD_DIM, gain * fade));
 	}
+	if (game->cabinet && blink)
+		write_centered(view_height - px(TITLE_PRESS_UP), "PRESS ANY KEY TO PLAY", px(HUD_ZONE_SIZE),
+			       light_scale(LIGHT_HUD, gain));
 	if (game->state == STATE_DEAD) {
 		double y = view_height * DEAD_Y;
 		write_centered(y, "SIGNAL LOST", px(BIG_SIZE), light_scale(LIGHT_HURT, gain));
@@ -655,11 +712,20 @@ int main(void)
 	level_build_rail(&game->rail);
 	pool_open();
 	scores_load();
+	// the picture exists before the window, the pilot of the bench and the
+	// wav rendering aim through it
+	draw_resize(VIEW_BASE_WIDTH, VIEW_BASE_HEIGHT);
 	sound_open();
 	// a run can start anywhere in the level, for a look at a zone
 	const char *start = getenv("TEC_START");
 	double start_at = start ? floor(atof(start) / BAR) * BAR : 0.0;
 	begin_run(game, start_at, 0);
+	const char *wav = getenv("TEC_WAV");
+	if (wav) {
+		int rc = render_wav(game, wav, start_at);
+		sound_close();
+		return rc;
+	}
 	struct screen screen;
 	if (!screen_open(&screen, GAME_NAME))
 		return 1;
@@ -668,10 +734,17 @@ int main(void)
 		begin_title(game);
 	struct keys keys = { 0 };
 	double last = now_in_seconds();
+	double last_key = sound_now();
+	int hand_seen = 0;
 	const char *trace = getenv("TEC_TRACE");
 	double traced_at = 0.0;
-	// on the bench the game plays itself, as a hand would
-	int pilot = getenv("TEC_PILOT") != NULL;
+	// on the test bench the pilot can play as if it were a hand, or nobody
+	// plays and the cabinet never comes, to look at a screen
+	int pilot = getenv("TEC_PILOT") ? atoi(getenv("TEC_PILOT")) : 0;
+	if (pilot)
+		hand_seen = 1;
+	if (pilot == 1)
+		demo_hand();
 
 	while (!keys.quit) {
 		double moment = now_in_seconds();
@@ -681,12 +754,54 @@ int main(void)
 		last = moment;
 		double now = sound_now();
 		screen_read_keys(&screen, &keys);
+		if (keys.any) {
+			keys.any = 0;
+			last_key = now;
+			hand_seen = 1;
+			// the hand is back, the cabinet lets go and the game launches
+			// for the player
+			if (game->cabinet) {
+				game->cabinet = 0;
+				keys.fire = keys.left = keys.right = keys.up = keys.down = 0;
+				begin_title(game);
+				now = sound_now();
+				begin_launch(game, now);
+			}
+		}
 		if (keys.mute) {
 			keys.mute = 0;
 			sound_mute(!sound_muted());
 		}
-		if (pilot)
-			demo_drive(&game->player, &game->camera, &keys, now);
+		// if nobody touches the keys at the title, the level plays itself
+		// for a minute, launch and all, then comes back to the title
+		int idle = !hand_seen && !game->cabinet && now - last_key > DEMO_AFTER;
+		if (idle && game->state == STATE_TITLE) {
+			game->cabinet = 1;
+			game->cabinet_at = now;
+			begin_launch(game, now);
+		}
+		if (game->cabinet) {
+			if (now - game->cabinet_at > DEMO_LENGTH || game->state == STATE_DEAD
+			    || game->state == STATE_WON || game->state == STATE_NAME) {
+				begin_title(game);
+				now = sound_now();
+				last_key = now;
+			} else if (game->state == STATE_PLAY) {
+				demo_drive(&game->player, &game->camera, &keys, now, game->zone, &game->boss);
+			}
+		} else if (pilot == 1) {
+			// the hand plays the whole run, and the screens between
+			switch (game->state) {
+			case STATE_TITLE: demo_title(&keys, now - game->state_at); break;
+			case STATE_PLAY:
+				demo_drive(&game->player, &game->camera, &keys, now, game->zone, &game->boss);
+				break;
+			case STATE_DEAD: demo_dead(&keys, now - game->state_at, game->boss.active); break;
+			case STATE_WON: demo_won(&keys, now - game->state_at); break;
+			case STATE_NAME: demo_name(&keys, now - game->state_at); break;
+			default: break;
+			}
+		}
 		int enter = keys.enter;
 		keys.enter = 0;
 		switch (game->state) {
@@ -728,6 +843,9 @@ int main(void)
 				scores_add(game->name, game->final_score, game->final_zone, game->final_chain);
 				scores_save();
 				begin_title(game);
+				// the cabinet may come back, unless the pilot has the keys
+				hand_seen = pilot != 0;
+				last_key = sound_now();
 			}
 			break;
 		}
