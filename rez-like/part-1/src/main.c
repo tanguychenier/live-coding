@@ -14,6 +14,7 @@
 #include "level.h"
 #include "palette.h"
 #include "particle.h"
+#include "player.h"
 #include "rail.h"
 #include "screen.h"
 #include "sound.h"
@@ -39,6 +40,7 @@
 
 struct game {
 	struct rail rail;
+	struct player player;
 	struct hero hero;
 	struct camera camera;
 	int zone;
@@ -58,6 +60,7 @@ static void begin_run(struct game *game, double at)
 {
 	sound_restart(at);
 	double now = sound_now();
+	player_reset(&game->player);
 	hero_reset(&game->hero);
 	particles_clear();
 	game->zone = level_zone(now);
@@ -102,12 +105,12 @@ static void place_camera(struct game *game, double elapsed)
 	camera_look(&game->camera, eye, at, vec(0, 1, 0), game->roll, FOCAL);
 }
 
-static void step_play(struct game *game, double elapsed, double now)
+static void step_play(struct game *game, const struct keys *keys, double elapsed, double now)
 {
 	game->t_eye = level_t_eye(&game->rail, now);
 	place_camera(game, elapsed);
-	// the pilot flies straight ahead for now, the sight comes next
-	hero_update(&game->hero, &game->camera, view_width / 2.0, view_height / 2.0, 0,
+	player_update(&game->player, keys, elapsed);
+	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y, 0,
 		    elapsed, now);
 	particles_update(elapsed);
 }
@@ -121,6 +124,7 @@ static void draw_frame(struct game *game, double now)
 	tunnel_draw(&game->camera, &game->rail, game->t_eye, now, pal);
 	particles_draw(&game->camera);
 	hero_draw(&game->hero, &game->camera, now);
+	player_draw(&game->player, now);
 	draw_finish();
 }
 
@@ -151,7 +155,7 @@ int main(void)
 			keys.mute = 0;
 			sound_mute(!sound_muted());
 		}
-		step_play(game, elapsed, now);
+		step_play(game, &keys, elapsed, now);
 		set_layers(game, now);
 		draw_frame(game, now);
 		screen_present(&screen);
