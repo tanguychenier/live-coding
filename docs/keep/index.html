@@ -10,8 +10,12 @@
                font-family: "DejaVu Sans Mono", ui-monospace, monospace; overflow: hidden; }
   #stage { position: relative; width: 100vw; height: 100vh; display: flex;
            flex-direction: column; align-items: center; justify-content: center; }
+  /* the game fills the window, full screen included, at its own aspect ratio :
+     as wide as the window allows, or as tall as the window minus the bar.
+     !important, because the SDL runtime writes its own size on the element */
   canvas { display: block; image-rendering: pixelated; outline: none;
-           max-width: 100vw; max-height: calc(100vh - 34px); }
+           width: min(100vw, calc((100vh - 34px) * (1280 / 800))) !important;
+           height: auto !important; max-width: 100vw; }
   #loadingCanvas { display: none; }
   #splash { position: absolute; inset: 0; display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 18px;
