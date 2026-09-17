@@ -9,6 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "demo.h"
 #include "draw.h"
 #include "hero.h"
 #include "level.h"
@@ -72,6 +73,7 @@ static void begin_run(struct game *game, double at, long score)
 	hero_reset(&game->hero);
 	things_clear();
 	particles_clear();
+	demo_reset();
 	level_reset(&game->level, now);
 	game->zone = level_zone(now);
 	game->t_eye = level_t_eye(&game->rail, now);
@@ -166,6 +168,8 @@ int main(void)
 	double last = now_in_seconds();
 	const char *trace = getenv("TEC_TRACE");
 	double traced_at = 0.0;
+	// on the bench the game plays itself, as a hand would
+	int pilot = getenv("TEC_PILOT") != NULL;
 
 	while (!keys.quit) {
 		double moment = now_in_seconds();
@@ -179,6 +183,8 @@ int main(void)
 			keys.mute = 0;
 			sound_mute(!sound_muted());
 		}
+		if (pilot)
+			demo_drive(&game->player, &game->camera, &keys, now);
 		step_play(game, &keys, elapsed, now);
 		set_layers(game, now);
 		draw_frame(game, now);
