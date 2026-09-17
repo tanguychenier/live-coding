@@ -32,6 +32,10 @@
 // a frame is never longer than this, whatever the machine did meanwhile
 #define FRAME_CAP        0.05
 #define FRAME_SECONDS    (1.0 / 60.0)
+// a chain of eight punches the eye in, the focal growing by this much and
+// easing back over this long
+#define PUNCH_ZOOM       0.2
+#define PUNCH_TIME       0.45
 // the groove of the tunnel builds up, the bass from this bar, the hats
 // from this one at half, then whole from this one
 #define UPLINK_BASS_BAR  4.0
@@ -48,6 +52,7 @@ struct game {
 	int zone;
 	double t_eye;
 	double roll;
+	double punch_at;
 };
 
 static double now_in_seconds(void)
@@ -57,17 +62,21 @@ static double now_in_seconds(void)
 	return (double)ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-// a run starts at a moment of the level
-static void begin_run(struct game *game, double at)
+// a run starts at a moment of the level, with the score it had there
+static void begin_run(struct game *game, double at, long score)
 {
 	sound_restart(at);
 	double now = sound_now();
 	player_reset(&game->player);
+	game->player.score = score;
 	hero_reset(&game->hero);
+	things_clear();
 	particles_clear();
+	level_reset(&game->level, now);
 	game->zone = level_zone(now);
 	game->t_eye = level_t_eye(&game->rail, now);
 	game->roll = 0.0;
+	game->punch_at = -PUNCH_TIME;
 	sound_zone(game->zone);
 }
 
@@ -96,7 +105,7 @@ static void set_layers(const struct game *game, double now)
 // the eye follows the rail and looks a little ahead of itself. in a bend,
 // the point looked at is off to one side, and the roll leans into it the
 // way a rider leans into a curve
-static void place_camera(struct game *game, double elapsed)
+static void place_camera(struct game *game, double elapsed, double now)
 {
 	struct vec forward, right, up;
 	rail_frame(&game->rail, game->t_eye, &forward, &right, &up);
@@ -104,18 +113,26 @@ static void place_camera(struct game *game, double elapsed)
 	struct vec at = rail_at(&game->rail, game->t_eye + LOOK_AHEAD);
 	double lean = dot(sub(at, rail_at(&game->rail, game->t_eye)), right);
 	game->roll += (-lean / LOOK_AHEAD * ROLL_GAIN - game->roll) * ROLL_EASE * elapsed;
-	camera_look(&game->camera, eye, at, vec(0, 1, 0), game->roll, FOCAL);
+	// the punch of a full chain
+	double focal = FOCAL;
+	double punch = 1.0 - (now - game->punch_at) / PUNCH_TIME;
+	if (punch > 0.0)
+		focal *= 1.0 + PUNCH_ZOOM * sin(punch * M_PI);
+	camera_look(&game->camera, eye, at, vec(0, 1, 0), game->roll, focal);
 }
 
 static void step_play(struct game *game, const struct keys *keys, double elapsed, double now)
 {
 	game->t_eye = level_t_eye(&game->rail, now);
-	place_camera(game, elapsed);
+	place_camera(game, elapsed, now);
 	level_update(&game->level, &game->rail, game->t_eye, now);
 	things_update(&game->rail, game->t_eye, elapsed, now);
 	player_update(&game->player, keys, elapsed);
-	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y, 0,
-		    elapsed, now);
+	player_aim(&game->player, &game->camera, game->hero.hands, now);
+	if (game->player.released_full)
+		game->punch_at = now;
+	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y,
+		    game->player.released, elapsed, now);
 	particles_update(elapsed);
 }
 
@@ -126,9 +143,10 @@ static void draw_frame(struct game *game, double now)
 	draw_fog(pal->fog);
 	draw_pulse(exp(-sound_beat_phase(now) * BEAT_DECAY));
 	tunnel_draw(&game->camera, &game->rail, game->t_eye, now, pal);
+	things_draw(&game->camera, now);
 	particles_draw(&game->camera);
 	hero_draw(&game->hero, &game->camera, now);
-	player_draw(&game->player, now);
+	player_draw(&game->player, &game->camera, now);
 	draw_finish();
 }
 
@@ -143,7 +161,7 @@ int main(void)
 		return 1;
 	// a run can start anywhere in the level, for a look at a moment of it
 	const char *start = getenv("TEC_START");
-	begin_run(game, start ? floor(atof(start) / BAR) * BAR : 0.0);
+	begin_run(game, start ? floor(atof(start) / BAR) * BAR : 0.0, 0);
 	struct keys keys = { 0 };
 	double last = now_in_seconds();
 	const char *trace = getenv("TEC_TRACE");
@@ -167,7 +185,8 @@ int main(void)
 		screen_present(&screen);
 		if (trace && moment - traced_at > 0.5) {
 			traced_at = moment;
-			fprintf(stderr, "t %.1f eye %.2f things %d\n", now, game->t_eye, things_count());
+			fprintf(stderr, "t %.1f eye %.2f things %d score %ld\n",
+				now, game->t_eye, things_count(), game->player.score);
 		}
 		double spent = now_in_seconds() - moment;
 		if (spent < FRAME_SECONDS)
