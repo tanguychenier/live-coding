@@ -10,8 +10,17 @@
                font-family: "DejaVu Sans Mono", ui-monospace, monospace; overflow: hidden; }
   #stage { position: relative; width: 100vw; height: 100vh; display: flex;
            flex-direction: column; align-items: center; justify-content: center; }
-  canvas { display: block; image-rendering: pixelated; outline: none;
-           max-width: 100vw; max-height: calc(100vh - 34px); }
+  /* the game fills the window, full screen included, at its own aspect ratio :
+     as wide as the window allows, or as tall as the window minus the bar.
+     !important, because the SDL runtime writes its own size on the element */
+  canvas { display: block; outline: none;
+           width: min(100vw, calc((100vh - 34px) * var(--ratio, calc(1088 / 640)))) !important;
+           height: auto !important; max-width: 100vw; }
+  /* full screen : nothing but the game, the bar is gone and the picture takes
+     the whole screen, black bands only if the screen has another shape */
+  :fullscreen #bar { display: none; }
+  :fullscreen #stage { background: #000; }
+  :fullscreen canvas { width: min(100vw, calc(100vh * var(--ratio, calc(1088 / 640)))) !important; }
   #loadingCanvas { display: none; }
   #splash { position: absolute; inset: 0; display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 18px;
@@ -29,9 +38,29 @@
                   animation: rise 0.6s 1.8s ease-out forwards; }
   #bar { width: 100%; box-sizing: border-box; display: flex; gap: 18px;
          padding: 8px 16px; color: #55677a; font-size: 12px; background: #070a10; }
+  /* a phone : the splash shrinks to the width, the bar wraps, and the game is
+     told that it wants a keyboard */
+  @media (max-width: 640px) {
+    #splash { gap: 12px; padding: 0 16px; text-align: center; }
+    #splash .brand { font-size: 22px; letter-spacing: 0.22em; }
+    #splash select { max-width: 80vw; }
+    #splash .title { font-size: 14px; letter-spacing: 0.12em; }
+    #splash .hint, #splash .choix { font-size: 12px; }
+    #splash .clavier { display: block; color: #8fa3b5; font-size: 12px; opacity: 0;
+                       animation: rise 0.6s 2.0s ease-out forwards; }
+    #bar { flex-wrap: wrap; gap: 8px 14px; font-size: 11px; padding: 8px 12px; }
+    #bar .keys { flex: 1 1 100%; }
+    canvas { width: 100vw !important; }
+  }
+  #splash .clavier { display: none; }
   #bar a { color: #8fa3b5; text-decoration: none; }
   #bar a:hover { color: #6fe0c8; }
   #bar .keys { flex: 1; }
+  #splash .choix { color: #8fa3b5; font-size: 13px; margin-top: 10px; opacity: 0;
+                   animation: rise 0.5s 1.9s ease-out forwards; }
+  #splash select { background: #0d1420; color: #e8eef4; border: 1px solid #1c2838;
+                   font: inherit; padding: 4px 6px; margin-left: 6px; }
+  #bar #taille { color: #55677a; margin-left: 14px; }
 </style>
 </head>
 <body>
@@ -43,12 +72,23 @@
     <div class="line"></div>
     <div class="title">STREET FIGHTER-LIKE</div>
     <div class="hint" id="hint">loading</div>
+    <div class="clavier">this game is played with a keyboard and a mouse</div>
+    <label class="choix" id="choix-taille">picture
+      <select id="taille-choisie">
+        <option value="auto">automatic, grows while the machine keeps up</option>
+        <option value="ecran">the whole screen</option>
+        <option value="1920x1080">1920 by 1080</option>
+        <option value="1280x800">1280 by 800</option>
+        <option value="960x600">960 by 600</option>
+      </select>
+    </label>
   </div>
   <div id="bar">
-    <span class="keys">enter start · q d move · z jump · s crouch · j punch · k kick</span>
+    <span class="keys">enter start · q d move · z jump · s crouch · j punch · k kick · esc leaves full screen, click the game to go back</span>
     <a href="https://youtu.be/gJOMl3DYnhg">watch it being written</a>
     <a href="https://github.com/tanguychenier/live-coding/tree/main/street-fighter-like">source</a>
     <a href="../">all the games</a>
+    <span id="taille"></span>
   </div>
 </div>
 <script>
@@ -67,8 +107,37 @@
     splash.style.transition = 'opacity 0.6s';
     splash.style.opacity = '0';
     setTimeout(() => { splash.remove(); document.getElementById('canvas').focus(); }, 650);
+    // the game opens full screen, from the click or the key that starts it,
+    // the only moment a browser allows it. escape gives the page back, the
+    // game keeps running, and a click on the canvas goes full screen again
+    const plein = () => { const p = document.documentElement.requestFullscreen; if (p) p.call(document.documentElement).catch(() => {}); };
+    plein();
+    document.getElementById('canvas').addEventListener('click', () => { if (!document.fullscreenElement) plein(); });
     document.getElementById('canvas').click();
   }
+  // the picture takes the shape of the screen : the page follows the size the
+  // game gives its canvas, so that the stretch keeps the proportions
+  const suivre = () => { const c = document.getElementById('canvas');
+    if (c.width && c.height) c.style.setProperty('--ratio', (c.width / c.height).toString()); };
+  new MutationObserver(suivre).observe(document.getElementById('canvas'), { attributes: true, attributeFilter: ['width', 'height'] });
+  suivre();
+  // the size of the picture : chosen on the splash, remembered, or given as
+  // ?taille=ecran / ?taille=1920x1080 ; the game reads window.__tw / __th
+  const choix = document.getElementById('taille-choisie');
+  choix.addEventListener('click', e => e.stopPropagation());
+  choix.addEventListener('keydown', e => e.stopPropagation());
+  try { const m = localStorage.getItem('taille'); if (m) choix.value = m; } catch (e) {}
+  const qs = new URLSearchParams(location.search).get('taille');
+  if (qs) choix.value = qs;
+  const poserTaille = () => {
+    const v = choix.value; let w = 0, h = 0;
+    if (v === 'ecran') { const d = window.devicePixelRatio || 1; w = Math.round(screen.width * d); h = Math.round(screen.height * d); }
+    else if (/^\d+x\d+$/.test(v)) { [w, h] = v.split('x').map(Number); }
+    window.__tw = w; window.__th = h;
+    try { localStorage.setItem('taille', v); } catch (e) {}
+  };
+  choix.addEventListener('change', poserTaille);
+  poserTaille();
   splash.addEventListener('click', start);
   window.addEventListener('keydown', e => {
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
