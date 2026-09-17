@@ -41,6 +41,10 @@
   #bar a { color: #8fa3b5; text-decoration: none; }
   #bar a:hover { color: #6fe0c8; }
   #bar .keys { flex: 1; }
+  #splash .choix { color: #8fa3b5; font-size: 13px; margin-top: 10px; opacity: 0;
+                   animation: rise 0.5s 1.9s ease-out forwards; }
+  #splash select { background: #0d1420; color: #e8eef4; border: 1px solid #1c2838;
+                   font: inherit; padding: 4px 6px; margin-left: 6px; }
   #bar #taille { color: #55677a; margin-left: 14px; }
 </style>
 </head>
@@ -53,6 +57,15 @@
     <div class="line"></div>
     <div class="title">THE KEEP</div>
     <div class="hint" id="hint">loading</div>
+    <label class="choix" id="choix-taille">picture
+      <select id="taille-choisie">
+        <option value="auto">automatic, grows while the machine keeps up</option>
+        <option value="ecran">the whole screen</option>
+        <option value="1920x1080">1920 by 1080</option>
+        <option value="1280x800">1280 by 800</option>
+        <option value="960x600">960 by 600</option>
+      </select>
+    </label>
   </div>
   <div id="bar">
     <span class="keys">arrows and mouse · ctrl attack · space open · 1 2 weapon · m map · n sound · esc menu · esc leaves full screen, click the game to go back</span>
@@ -92,6 +105,23 @@
     if (c.width && c.height) c.style.setProperty('--ratio', (c.width / c.height).toString()); };
   new MutationObserver(suivre).observe(document.getElementById('canvas'), { attributes: true, attributeFilter: ['width', 'height'] });
   suivre();
+  // the size of the picture : chosen on the splash, remembered, or given as
+  // ?taille=ecran / ?taille=1920x1080 ; the game reads window.__tw / __th
+  const choix = document.getElementById('taille-choisie');
+  choix.addEventListener('click', e => e.stopPropagation());
+  choix.addEventListener('keydown', e => e.stopPropagation());
+  try { const m = localStorage.getItem('taille'); if (m) choix.value = m; } catch (e) {}
+  const qs = new URLSearchParams(location.search).get('taille');
+  if (qs) choix.value = qs;
+  const poserTaille = () => {
+    const v = choix.value; let w = 0, h = 0;
+    if (v === 'ecran') { const d = window.devicePixelRatio || 1; w = Math.round(screen.width * d); h = Math.round(screen.height * d); }
+    else if (/^\d+x\d+$/.test(v)) { [w, h] = v.split('x').map(Number); }
+    window.__tw = w; window.__th = h;
+    try { localStorage.setItem('taille', v); } catch (e) {}
+  };
+  choix.addEventListener('change', poserTaille);
+  poserTaille();
   splash.addEventListener('click', start);
   window.addEventListener('keydown', e => {
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
@@ -104,7 +134,7 @@
     onRuntimeInitialized: function () { ready = true; hint.textContent = 'click, or press enter'; },
     // the game says at what size it draws ("picture: W by H") : shown in the
     // bar, so that a soft picture can be told from a small one
-    print: function (t) { console.log(t); const m = /^picture: (\d+) by (\d+)/.exec(t); if (m) { const e = document.getElementById('taille'); if (e) e.textContent = 'drawn at ' + m[1] + ' by ' + m[2]; } },
+    print: function (t) { console.log(t); const m = /^picture: ([0-9]+) by ([0-9]+)/.exec(t); if (m) { const e = document.getElementById('taille'); if (e) e.textContent = 'drawn at ' + m[1] + ' by ' + m[2]; } },
     printErr: function (t) { console.error(t); },
   };
 </script>
