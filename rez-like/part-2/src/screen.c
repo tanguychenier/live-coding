@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,25 +9,83 @@
 #include <X11/Xutil.h>
 
 #include "draw.h"
+#include "pool.h"
 #include "screen.h"
 
-// the picture follows the window. a new size means a new picture and a new
-// image over it, XCreateImage copies nothing
+// the picture is the window, or the window shrunk by a whole number when
+// the window has more pixels than the budget. the stretch back mixes the
+// four picture pixels around each window pixel, by distance, and the
+// columns and rows to mix are worked out once per window size
+static void screen_fit(struct screen *screen)
+{
+	int divisor = 1;
+	while ((screen->width / divisor) * (screen->height / divisor) > VIEW_PIXELS_MAX)
+		divisor++;
+	int wide = screen->width / divisor, tall = screen->height / divisor;
+	if (wide < VIEW_MIN_WIDTH)
+		wide = VIEW_MIN_WIDTH;
+	if (tall < VIEW_MIN_HEIGHT)
+		tall = VIEW_MIN_HEIGHT;
+	draw_resize(wide, tall);
+	// the picture keeps its shape, as big as fits, centred
+	double across = (double)screen->width / view_width;
+	double down = (double)screen->height / view_height;
+	double zoom = across < down ? across : down;
+	screen->wide = (int)(view_width * zoom);
+	screen->tall = (int)(view_height * zoom);
+	screen->left = (screen->width - screen->wide) / 2;
+	screen->top = (screen->height - screen->tall) / 2;
+	free(screen->col0);
+	free(screen->row0);
+	free(screen->strips);
+	screen->col0 = calloc((size_t)screen->wide * 3, sizeof *screen->col0);
+	screen->row0 = calloc((size_t)screen->tall * 3, sizeof *screen->row0);
+	screen->strips = calloc((size_t)screen->wide * view_height, sizeof *screen->strips);
+	screen->col1 = screen->col0 + screen->wide;
+	screen->col_mix = screen->col1 + screen->wide;
+	screen->row1 = screen->row0 + screen->tall;
+	screen->row_mix = screen->row1 + screen->tall;
+	for (int x = 0; x < screen->wide; x++) {
+		double at = (x + 0.5) / zoom - 0.5;
+		int first = (int)floor(at);
+		screen->col_mix[x] = (int)((at - first) * STRETCH_STEPS);
+		screen->col0[x] = first < 0 ? 0 : first;
+		screen->col1[x] = first + 1 >= view_width ? view_width - 1 : first + 1;
+	}
+	for (int y = 0; y < screen->tall; y++) {
+		double at = (y + 0.5) / zoom - 0.5;
+		int first = (int)floor(at);
+		screen->row_mix[y] = (int)((at - first) * STRETCH_STEPS);
+		screen->row0[y] = first < 0 ? 0 : first;
+		screen->row1[y] = first + 1 >= view_height ? view_height - 1 : first + 1;
+	}
+}
+
+// the window buffer follows the window. a new size means a new buffer and
+// a new image, and a new picture
 static int screen_resize(struct screen *screen, int width, int height)
 {
 	if (screen->image) {
 		screen->image->data = NULL;
 		XDestroyImage(screen->image);
+		free(screen->pixels);
 	}
 	screen->width = width;
 	screen->height = height;
-	if (!draw_resize(width, height))
+	screen->pixels = calloc((size_t)width * height, sizeof *screen->pixels);
+	if (!screen->pixels)
 		return 0;
+	screen_fit(screen);
+	// when the picture is the window, the image is made over the picture
+	// itself, there is nothing to copy
+	screen->direct = screen->wide == view_width && screen->tall == view_height
+		&& screen->left == 0 && screen->top == 0;
 	int number = DefaultScreen(screen->display);
 	screen->image = XCreateImage(screen->display,
 		DefaultVisual(screen->display, number),
 		(unsigned int)DefaultDepth(screen->display, number), ZPixmap, 0,
-		(char *)view, (unsigned int)width, (unsigned int)height, 32, 0);
+		(char *)(screen->direct ? view : screen->pixels), (unsigned int)width,
+		(unsigned int)height, 32, 0);
 	return screen->image != NULL;
 }
 
@@ -113,7 +172,11 @@ void screen_close(struct screen *screen)
 	if (screen->image) {
 		screen->image->data = NULL;
 		XDestroyImage(screen->image);
+		free(screen->pixels);
 	}
+	free(screen->col0);
+	free(screen->row0);
+	free(screen->strips);
 	XFreeGC(screen->display, screen->gc);
 	XDestroyWindow(screen->display, screen->window);
 	XCloseDisplay(screen->display);
@@ -162,8 +225,9 @@ void screen_read_keys(struct screen *screen, struct keys *keys)
 			screen_resize(screen, event.xconfigure.width,
 				      event.xconfigure.height);
 		if (event.type == MotionNotify) {
-			keys->mouse_x = event.xmotion.x;
-			keys->mouse_y = event.xmotion.y;
+			// the mouse is read in picture pixels, whatever the window size
+			keys->mouse_x = (event.xmotion.x - screen->left) * view_width / screen->wide;
+			keys->mouse_y = (event.xmotion.y - screen->top) * view_height / screen->tall;
 		}
 		if (event.type == ButtonPress || event.type == ButtonRelease) {
 			keys->mouse_down = event.type == ButtonPress;
@@ -188,17 +252,86 @@ void screen_read_keys(struct screen *screen, struct keys *keys)
 			// in the same frame, so these are counted and read once
 			case XK_Return:
 			case XK_KP_Enter:  if (down) keys->enter = 1; break;
-			case XK_n:
-			case XK_N:         if (down) keys->mute = 1; break;
+			case XK_BackSpace: if (down) keys->erase = 1; break;
 			case XK_F11:       if (down) screen_toggle_fullscreen(screen); break;
+			default:
+				// a letter or a digit, for the name on the score table.
+				// n on its own is the sound, when nobody is writing
+				if (down && key >= XK_a && key <= XK_z)
+					keys->typed = (char)('A' + (key - XK_a));
+				else if (down && key >= XK_0 && key <= XK_9)
+					keys->typed = (char)('0' + (key - XK_0));
+				if (down && (key == XK_n || key == XK_N))
+					keys->mute = 1;
+				break;
 			}
 		}
 	}
 }
 
-// the image is the picture, so the whole of it goes to the window at once
+// a pixel holds three bytes, and two pixels are mixed in two multiplies by
+// keeping the red and blue bytes in one word and the green in another, so
+// that the bytes cannot run into each other
+#define BYTE_MASK       ((1u << 8) - 1)
+#define RED_BLUE_MASK   (BYTE_MASK | (BYTE_MASK << 16))
+#define GREEN_MASK      (BYTE_MASK << 8)
+
+static unsigned int mix_pixels(unsigned int a, unsigned int b, int weight)
+{
+	unsigned int keep = STRETCH_STEPS - (unsigned int)weight, take = (unsigned int)weight;
+	unsigned int rb = ((a & RED_BLUE_MASK) * keep + (b & RED_BLUE_MASK) * take) >> STRETCH_SHIFT;
+	unsigned int g = ((a & GREEN_MASK) * keep + (b & GREEN_MASK) * take) >> STRETCH_SHIFT;
+	return (rb & RED_BLUE_MASK) | (g & GREEN_MASK);
+}
+
+// the picture is stretched into the window in two steps, each picture row
+// stretched along into a strip as wide as the window, then each window row
+// mixed from the two strips around it
+static void stretch_along(int first, int last, void *data)
+{
+	struct screen *screen = data;
+	for (int y = first; y < last; y++) {
+		const unsigned int *row = view + y * view_width;
+		unsigned int *strip = screen->strips + (size_t)y * screen->wide;
+		for (int x = 0; x < screen->wide; x++)
+			strip[x] = mix_pixels(row[screen->col0[x]], row[screen->col1[x]],
+					      screen->col_mix[x]);
+	}
+}
+
+static void stretch_down(int first, int last, void *data)
+{
+	struct screen *screen = data;
+	for (int y = first; y < last; y++) {
+		const unsigned int *above = screen->strips + (size_t)screen->row0[y] * screen->wide;
+		const unsigned int *below = screen->strips + (size_t)screen->row1[y] * screen->wide;
+		int down = screen->row_mix[y];
+		unsigned int *out = screen->pixels
+			+ (size_t)(screen->top + y) * screen->width + screen->left;
+		for (int x = 0; x < screen->wide; x++)
+			out[x] = mix_pixels(above[x], below[x], down);
+	}
+}
+
+// at the picture's own size the rows are copied whole
+static void copy_rows(int first, int last, void *data)
+{
+	struct screen *screen = data;
+	for (int y = first; y < last; y++)
+		memcpy(screen->pixels + (size_t)(screen->top + y) * screen->width + screen->left,
+		       view + y * view_width, (size_t)view_width * sizeof *view);
+}
+
 void screen_present(struct screen *screen)
 {
+	if (screen->direct) {
+		// the image is the picture
+	} else if (screen->wide == view_width && screen->tall == view_height) {
+		pool_run(view_height, copy_rows, screen);
+	} else {
+		pool_run(view_height, stretch_along, screen);
+		pool_run(screen->tall, stretch_down, screen);
+	}
 	XPutImage(screen->display, screen->window, screen->gc, screen->image,
 		  0, 0, 0, 0, (unsigned int)screen->width,
 		  (unsigned int)screen->height);

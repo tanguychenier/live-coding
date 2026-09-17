@@ -30,12 +30,6 @@ struct camera {
 #define FLAT_WIDTH     0.9
 // a filled face is this much of its edges' light, a tint and not a wall
 #define FACE_LIGHT     0.16
-// a point of light never grows past this many pixels of radius at the base
-// size, a spark passing the eye must not fill the screen
-#define POINT_RADIUS_MAX 8.0
-// the soft shoulder of the tone curve. light past one goes white gently
-#define TONE_KNEE      1.6
-
 // the bloom, how much of the blurred picture is added back, and how much more
 // on the beat
 #define BLOOM_AMOUNT   0.9
@@ -43,6 +37,11 @@ struct camera {
 // the blur works on a picture this many times smaller at the base size,
 // and as many times more on a bigger picture, so the glow keeps its reach
 #define BLOOM_DOWN     4
+// the soft shoulder of the tone curve. light past one goes white gently
+#define TONE_KNEE      1.6
+// a point of light never grows past this many pixels of radius at the base
+// size, a spark passing the eye must not fill the screen
+#define POINT_RADIUS_MAX 8.0
 
 // a colour in floating point, so that light can add up past white before
 // it is clamped
@@ -80,6 +79,8 @@ double draw_scale(void);
 void draw_clear(struct light top, struct light bottom);
 // the fog of the frame. at this depth a line keeps a third of its light
 void draw_fog(double depth);
+// the beat, zero to one, the bloom swells with it
+void draw_pulse(double gain);
 void draw_line(const struct camera *cam, struct vec from, struct vec to,
 	       struct light colour);
 // a flat face, fogged like a line, faint like glass
@@ -87,18 +88,16 @@ void draw_triangle(const struct camera *cam, struct vec first, struct vec second
 		   struct vec third, struct light colour);
 void draw_point(const struct camera *cam, struct vec point, struct light colour,
 		double size);
-// the tone curve, and the picture is done
-void draw_finish(void);
-// a line in screen pixels, for the sight. it sits on the near plane, in
-// front of everything, and the fog leaves it alone
+// the picture is finished with a wash of light over everything, black for
+// nothing, red for a hit, white for the end
+void draw_finish(struct light wash);
+// a line in screen pixels, for the sight and the numbers. it sits on the near
+// plane, in front of everything, and the fog leaves it alone
 void draw_line_2d(double x0, double y0, double x1, double y1, struct light colour);
 // where a point of the world lands on the screen, or 0 if it is behind the eye
 int draw_project(const struct camera *cam, struct vec point, double *x, double *y,
 		 double *z);
 void camera_look(struct camera *cam, struct vec eye, struct vec at,
 		 struct vec up, double roll, double focal);
-
-// the beat, zero to one, the bloom swells with it
-void draw_pulse(double gain);
 
 #endif

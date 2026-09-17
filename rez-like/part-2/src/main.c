@@ -35,6 +35,13 @@
 // a frame is never longer than this, whatever the machine did meanwhile
 #define FRAME_CAP        0.05
 #define FRAME_SECONDS    (1.0 / 60.0)
+// a hit shakes the eye for this long and this far, in world units
+#define HURT_SHAKE       0.35
+#define SHAKE_SIZE       0.35
+#define SHAKE_RATE       40.0
+// a hit washes the picture red for this long
+#define HURT_WASH        0.25
+#define HURT_WASH_GAIN   0.16
 // a chain of eight punches the eye in, the focal growing by this much and
 // easing back over this long
 #define PUNCH_ZOOM       0.2
@@ -45,6 +52,9 @@
 // the first seconds say what the hands do, and the words fade over the last
 #define LESSON_TIME      9.0
 #define LESSON_FADE      1.0
+// on the death screen enter only counts after this, so that a hand still
+// mashing fire does not skip it
+#define DEATH_WAIT       1.0
 // the groove of the tunnel builds up, the bass from this bar, the hats
 // from this one at half, then whole from this one
 #define UPLINK_BASS_BAR  4.0
@@ -66,10 +76,13 @@
 #define HUD_BLINK_ON     0.6      // and how much of each blink is on
 // where the big lines sit, as fractions of the height, and how far apart
 #define TITLE_Y          0.3
+#define DEAD_Y           0.36
 #define LINE_GAP         34.0
 #define BIG_SIZE         6.0
 #define MID_SIZE         4.0
 #define SMALL_SIZE       3.0
+
+enum state { STATE_PLAY, STATE_DEAD };
 
 struct game {
 	struct rail rail;
@@ -77,11 +90,15 @@ struct game {
 	struct hero hero;
 	struct level level;
 	struct camera camera;
+	enum state state;
+	double state_at;
 	int zone;
 	double zone_at;
 	double t_eye;
 	double roll;
 	double punch_at;
+	double flash_at;
+	int fire_let_go;         // on the death screen, fire has been let go since the death
 };
 
 static double now_in_seconds(void)
@@ -102,11 +119,14 @@ static void begin_run(struct game *game, double at, long score)
 	things_clear();
 	particles_clear();
 	level_reset(&game->level, now, score);
+	game->state = STATE_PLAY;
+	game->state_at = now;
 	game->zone = level_zone(now);
 	game->zone_at = now;
 	game->t_eye = level_t_eye(&game->rail, now);
 	game->roll = 0.0;
 	game->punch_at = -PUNCH_TIME;
+	game->flash_at = -HURT_WASH;
 	sound_zone(game->zone);
 	demo_reset();
 }
@@ -120,6 +140,7 @@ static const double MIX[ZONES][LAYER_COUNT] = {
 	{ 1.0, 1.0, 1.0, 0.5, 0.9, 0.0 },
 	{ 1.0, 1.0, 1.0, 0.6, 0.6, 0.9 },
 };
+static const double MIX_DEAD[LAYER_COUNT] = { 0.0, 0.0, 0.0, 0.5, 0.0, 0.0 };
 
 static void set_layers(const struct game *game, double now)
 {
@@ -132,6 +153,9 @@ static void set_layers(const struct game *game, double now)
 		level[LAYER_HAT] = bars < UPLINK_HAT_BAR ? 0.0
 			: bars < UPLINK_HAT_FULL_BAR ? UPLINK_HAT_HALF : 1.0;
 	}
+	if (game->state == STATE_DEAD)
+		for (int i = 0; i < LAYER_COUNT; i++)
+			level[i] = MIX_DEAD[i];
 	for (int i = 0; i < LAYER_COUNT; i++)
 		sound_layer((enum layer)i, level[i]);
 }
@@ -151,6 +175,12 @@ static void place_camera(struct game *game, struct sight *sight, double elapsed,
 	// bend if it is not
 	motion = scale(forward, level_speed(&game->rail, game->t_eye) * RAIL_SPACING);
 	bend = vec(0, 0, 0);
+	// a hit knocks the eye sideways for a moment
+	if (now - game->player.hurt_at < HURT_SHAKE && game->player.hurt_at > 0) {
+		double fade = 1.0 - (now - game->player.hurt_at) / HURT_SHAKE;
+		struct vec side = unit(cross(sub(at, eye), vec(0, 1, 0)));
+		eye = add(eye, scale(side, SHAKE_SIZE * fade * ((int)(now * SHAKE_RATE) % 2 ? 1 : -1)));
+	}
 	// the punch of a full chain
 	double focal = FOCAL;
 	double punch = 1.0 - (now - game->punch_at) / PUNCH_TIME;
@@ -161,6 +191,23 @@ static void place_camera(struct game *game, struct sight *sight, double elapsed,
 	sight->forward = game->camera.forward;
 	sight->motion = motion;
 	sight->bend = bend;
+}
+
+// the run is over, won or given up, back to the start
+static void end_run(struct game *game)
+{
+	begin_run(game, 0.0, 0);
+}
+
+// the death screen keeps the world as it was, only the sparks and the
+// pilot go on moving
+static void step_frozen(struct game *game, double elapsed, double now)
+{
+	struct sight sight;
+	place_camera(game, &sight, elapsed, now);
+	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y, 0, 0,
+		    elapsed, now);
+	particles_update(elapsed);
 }
 
 static void step_play(struct game *game, const struct keys *keys, double elapsed, double now)
@@ -175,9 +222,10 @@ static void step_play(struct game *game, const struct keys *keys, double elapsed
 	struct sight sight;
 	place_camera(game, &sight, elapsed, now);
 	level_update(&game->level, &game->rail, game->t_eye, now, game->player.score);
-	things_update(&game->rail, game->t_eye, &sight, elapsed, now);
-	// nothing hurts yet, the hits come with the life
-	int hurt = 0;
+	int reached = things_update(&game->rail, game->t_eye, &sight, elapsed, now);
+	int hurt = player_hurt(&game->player, reached, now);
+	if (hurt)
+		game->flash_at = now;
 	player_update(&game->player, keys, elapsed);
 	player_aim(&game->player, &game->camera, game->hero.hands, now);
 	if (game->player.released_full)
@@ -185,8 +233,14 @@ static void step_play(struct game *game, const struct keys *keys, double elapsed
 	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y,
 		    game->player.released, hurt, elapsed, now);
 	particles_update(elapsed);
-	if (!game->player.alive)
+	if (!game->player.alive) {
+		// the signal is lost and everything in it bursts, so that the
+		// screen that follows is written on the dark
+		game->state = STATE_DEAD;
+		game->state_at = now;
+		game->fire_let_go = 0;
 		things_scatter();
+	}
 }
 
 // the numbers are laid out in base pixels and scaled to the picture
@@ -206,6 +260,7 @@ static void draw_hud(const struct game *game, double now, double gain)
 {
 	const struct player *player = &game->player;
 	char text[HUD_TEXT_MAX];
+	int blink = fmod(now * HUD_BLINK, 1.0) < HUD_BLINK_ON;
 	snprintf(text, sizeof text, "%08ld", player->score);
 	font_write(px(HUD_MARGIN), px(HUD_MARGIN - 2), text, px(HUD_SCORE_SIZE),
 		   light_scale(LIGHT_HUD, gain));
@@ -229,18 +284,30 @@ static void draw_hud(const struct game *game, double now, double gain)
 	}
 	// the name of the zone, big, when it starts
 	double title = 1.0 - (now - game->zone_at) / ZONE_TITLE_TIME;
-	if (title > 0.0) {
+	if (title > 0.0 && game->state == STATE_PLAY) {
 		double fade = sin(title * M_PI);
 		write_centered(view_height * TITLE_Y, palette_of(game->zone)->name, px(ZONE_TITLE_SIZE),
 			       light_scale(LIGHT_HUD, gain * fade));
 	}
 	// the first seconds say what the hands do
-	if (now < LESSON_TIME) {
+	if (game->state == STATE_PLAY && now < LESSON_TIME) {
 		double fade = fmin(1.0, (LESSON_TIME - now) / LESSON_FADE);
 		write_centered(px(HUD_LESSON_Y), "ARROWS OR MOUSE MOVE THE SIGHT", px(HUD_ZONE_SIZE),
 			       light_scale(LIGHT_HUD_DIM, gain * fade));
 		write_centered(px(HUD_LESSON_Y + 16), "HOLD SPACE OR CLICK TO MARK   LET GO TO FIRE",
 			       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD_DIM, gain * fade));
+	}
+	if (game->state == STATE_DEAD) {
+		double y = view_height * DEAD_Y;
+		write_centered(y, "SIGNAL LOST", px(BIG_SIZE), light_scale(LIGHT_HURT, gain));
+		snprintf(text, sizeof text, "SCORE %08ld", player->score);
+		write_centered(y + px(LINE_GAP + 10), text, px(SMALL_SIZE), light_scale(LIGHT_HUD, gain));
+		if (now - game->state_at > DEATH_WAIT && blink)
+			write_centered(y + px(2 * LINE_GAP + 8), "PRESS ENTER TO TRY THE ZONE AGAIN",
+				       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD, gain));
+		if (now - game->state_at > DEATH_WAIT)
+			write_centered(y + px(3 * LINE_GAP), "SPACE TO END THE RUN", px(HUD_ZONE_SIZE),
+				       light_scale(LIGHT_HUD_DIM, gain));
 	}
 }
 
@@ -254,9 +321,15 @@ static void draw_frame(struct game *game, double now)
 	things_draw(&game->camera, now);
 	particles_draw(&game->camera);
 	hero_draw(&game->hero, &game->camera, now);
-	player_draw(&game->player, &game->camera, now);
+	if (game->state == STATE_PLAY)
+		player_draw(&game->player, &game->camera, now);
 	draw_hud(game, now, HUD_GLOW);
-	draw_finish();
+	// the wash, red for a hit
+	struct light wash = LIGHT_BLACK;
+	double hurt = 1.0 - (now - game->flash_at) / HURT_WASH;
+	if (hurt > 0.0)
+		wash = light_scale(LIGHT_HURT, hurt * HURT_WASH_GAIN);
+	draw_finish(wash);
 	draw_hud(game, now, 1.0);
 }
 
@@ -294,14 +367,34 @@ int main(void)
 		}
 		if (pilot)
 			demo_drive(&game->player, &game->camera, &keys, now);
-		step_play(game, &keys, elapsed, now);
+		int enter = keys.enter;
+		keys.enter = 0;
+		switch (game->state) {
+		case STATE_PLAY:
+			step_play(game, &keys, elapsed, now);
+			break;
+		case STATE_DEAD:
+			step_frozen(game, elapsed, now);
+			// a fire held since before the death does not end the run, it
+			// has to be let go and pressed again
+			if (!keys.fire)
+				game->fire_let_go = 1;
+			if (enter && now - game->state_at > DEATH_WAIT)
+				begin_run(game, level_zone_time(game->zone), game->level.zone_score);
+			else if (keys.fire && game->fire_let_go && now - game->state_at > DEATH_WAIT) {
+				keys.fire = 0;
+				end_run(game);
+			}
+			break;
+		}
 		set_layers(game, now);
 		draw_frame(game, now);
 		screen_present(&screen);
 		if (trace && moment - traced_at > 0.5) {
 			traced_at = moment;
-			fprintf(stderr, "t %.1f zone %d eye %.2f things %d score %ld health %d\n",
-				now, game->zone, game->t_eye, things_count(), game->player.score, game->player.health);
+			fprintf(stderr, "t %.1f zone %d eye %.2f things %d score %ld health %d state %d\n",
+				now, game->zone, game->t_eye, things_count(), game->player.score, game->player.health,
+				game->state);
 		}
 		double spent = now_in_seconds() - moment;
 		if (spent < FRAME_SECONDS)

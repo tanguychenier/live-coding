@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "draw.h"
+#include "pool.h"
 
 unsigned int *view;
 int view_width, view_height;
@@ -270,7 +271,32 @@ void draw_line(const struct camera *cam, struct vec from, struct vec to,
 	    || (x0 >= view_width && x1 >= view_width)
 	    || (y0 >= view_height && y1 >= view_height))
 		return;
-	line_2d(x0, y0, start.z, x1, y1, finish.z, colour, 1.0);
+	// a line that leaves the screen far away is cut at a generous border,
+	// so that its pixel walk stays short
+	const double border = 64.0 * scale_up;
+	double lo_x = -border, hi_x = view_width + border;
+	double lo_y = -border, hi_y = view_height + border;
+	double t0 = 0.0, t1 = 1.0;
+	double ex = x1 - x0, ey = y1 - y0;
+	double edge[4] = { -ex, ex, -ey, ey };
+	double room[4] = { x0 - lo_x, hi_x - x0, y0 - lo_y, hi_y - y0 };
+	for (int i = 0; i < 4; i++) {
+		if (edge[i] == 0.0) {
+			if (room[i] < 0.0)
+				return;
+			continue;
+		}
+		double t = room[i] / edge[i];
+		if (edge[i] < 0.0 && t > t0)
+			t0 = t;
+		if (edge[i] > 0.0 && t < t1)
+			t1 = t;
+	}
+	if (t0 > t1)
+		return;
+	double z0 = start.z + (finish.z - start.z) * t0, z1 = start.z + (finish.z - start.z) * t1;
+	line_2d(x0 + ex * t0, y0 + ey * t0, z0, x0 + ex * t1, y0 + ey * t1, z1,
+		colour, 1.0);
 }
 
 // the flat picture is never dimmed and its strokes grow with the picture,
@@ -519,6 +545,7 @@ static void pack_row(unsigned int *restrict out, const int *restrict r, const in
 // added up into the small picture of the next frame's glow on the way
 struct finish_job {
 	float amount;
+	float wash[3];
 };
 
 static void finish_bands(int first, int last, void *data)
@@ -538,7 +565,8 @@ static void finish_bands(int first, int last, void *data)
 			y1 = view_height;
 		for (int y = y0; y < y1; y++) {
 			struct light sky = light_mix(sky_top, sky_bottom, (double)y / view_height);
-			float base[3] = { (float)sky.r, (float)sky.g, (float)sky.b };
+			float base[3] = { (float)sky.r + job->wash[0], (float)sky.g + job->wash[1],
+					  (float)sky.b + job->wash[2] };
 			size_t row = (size_t)y * view_width;
 			for (int ch = 0; ch < 3; ch++) {
 				float *src = plane[ch] + row;
@@ -566,13 +594,14 @@ static void finish_bands(int first, int last, void *data)
 	}
 }
 
-void draw_finish(void)
+void draw_finish(struct light wash)
 {
 	// a line covers less of a bigger block, so the glow of a bigger picture
 	// is scaled back up by the block, to keep the same neon
 	struct finish_job job = {
-		(float)(BLOOM_AMOUNT * (1.0 + BLOOM_PULSE * pulse) * bloom_down / BLOOM_DOWN) };
-	finish_bands(0, (view_height + bloom_down - 1) / bloom_down, &job);
-	blur_and_stretch(0, 3, NULL);
+		(float)(BLOOM_AMOUNT * (1.0 + BLOOM_PULSE * pulse) * bloom_down / BLOOM_DOWN),
+		{ (float)wash.r, (float)wash.g, (float)wash.b } };
+	pool_run((view_height + bloom_down - 1) / bloom_down, finish_bands, &job);
+	pool_run(3, blur_and_stretch, NULL);
 	finished = 1;
 }
