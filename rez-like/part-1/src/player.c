@@ -45,8 +45,9 @@ static void move_cursor(struct player *player, const struct keys *keys, double e
 	if (player->cursor_y > view_height - 1) player->cursor_y = view_height - 1;
 }
 
-// fire held, every target under the cursor gets a lock, once, up to eight
-static void mark(struct player *player, const struct camera *cam)
+// fire held, every target under the cursor gets a lock, once, up to eight.
+// each lock plays a note, one degree higher than the one before
+static void mark(struct player *player, const struct camera *cam, double now)
 {
 	for (int i = 0; i < THINGS_MAX && player->locks < LOCKS_MAX; i++) {
 		const struct thing *thing = &things[i];
@@ -58,8 +59,10 @@ static void mark(struct player *player, const struct camera *cam)
 		double dist = hypot(x - player->cursor_x, y - player->cursor_y);
 		double depth = fmax(1.0, length(sub(thing->at, cam->eye)));
 		double reach = (LOCK_RADIUS + thing->size * LOCK_SIZE_GAIN / depth) * draw_scale();
-		if (dist < reach)
+		if (dist < reach) {
+			sound_hit(HIT_LOCK, player->locks, sound_next_step(now));
 			player->locked[player->locks++] = thing->serial;
+		}
 	}
 }
 
@@ -80,6 +83,7 @@ static void release(struct player *player, double now)
 			shot->land = shot->launch + SHOT_FLIGHT_STEPS * STEP;
 			shot->note = i;
 			shot->side = (i % 3) - 1;
+			sound_hit(HIT_SHOT, i, shot->launch);
 			break;
 		}
 	}
@@ -107,13 +111,16 @@ static struct vec shot_at(const struct shot *shot, const struct thing *thing, do
 	return add(straight, vec(bend * shot->side, bend * SHOT_CURVE_UP * (shot->note % 2 ? 1 : -1), 0));
 }
 
-static void land(struct player *player, struct thing *thing, double now)
+static void land(struct player *player, struct shot *shot, struct thing *thing, double now)
 {
 	if (thing_hurt(thing, now)) {
 		player->kills++;
 		// the score rewards the chain, eight at once are worth far more
 		// than eight one by one
 		player->score += (long)SCORE_KILL * player->chain * player->chain;
+		sound_hit(HIT_KILL, shot->note, shot->land);
+	} else {
+		sound_hit(HIT_LOCK, shot->note, shot->land);
 	}
 }
 
@@ -138,7 +145,7 @@ static void fly_shots(struct player *player, struct vec from, double now)
 		}
 		if (now >= shot->land) {
 			shot->used = 0;
-			land(player, thing, now);
+			land(player, shot, thing, now);
 		}
 	}
 }
@@ -164,7 +171,7 @@ void player_aim(struct player *player, const struct camera *cam, struct vec from
 	for (int i = 0; i < THINGS_MAX; i++)
 		things[i].locked = 0;
 	if (player->holding)
-		mark(player, cam);
+		mark(player, cam, now);
 	else if (player->was_holding)
 		release(player, now);
 	player->was_holding = player->holding;

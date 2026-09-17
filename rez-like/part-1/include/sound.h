@@ -34,6 +34,11 @@ enum layer {
 	LAYER_COUNT
 };
 
+// what the player does, each with its own voice. the note is a degree of
+// the scale, from zero up, and it is the caller who spreads a chain of
+// eight shots over eight rising degrees
+enum hit { HIT_LOCK, HIT_SHOT, HIT_KILL, HIT_COUNT };
+
 int  sound_open(void);
 void sound_close(void);
 // seconds on the music clock, the one the pictures and the shots follow.
@@ -49,6 +54,8 @@ double sound_beat_phase(double t);
 void sound_layer(enum layer which, double target);
 // the chord and the bass root of the zone
 void sound_zone(int zone);
+// plays a hit at a moment on the music clock, quantized by the caller
+void sound_hit(enum hit which, int note, double when);
 void sound_mute(int on);
 int  sound_muted(void);
 

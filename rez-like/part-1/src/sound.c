@@ -18,6 +18,9 @@
 #define OCTAVE_BASS      2
 #define OCTAVE_PAD       3
 #define OCTAVE_HIT       4
+// the mixer holds this many hits at once. eight shots and their eight
+// impacts overlap the locks of the next chain
+#define VOICES           48
 // a filter cannot be asked for more than the top of hearing
 #define FILTER_TOP       20000.0
 // the delay, three sixteenths on the left and two on the right, which is
@@ -45,6 +48,15 @@ static double lowpass(struct filter *filter, double in, double cut, double reson
 	double high = in - filter->low - resonance * filter->band;
 	filter->band += g * high;
 	return filter->low;
+}
+
+static double bandpass(struct filter *filter, double in, double cut, double resonance)
+{
+	double g = 2.0 * sin(M_PI * (cut < FILTER_TOP ? cut : FILTER_TOP) / SOUND_RATE);
+	filter->low += g * filter->band;
+	double high = in - filter->low - resonance * filter->band;
+	filter->band += g * high;
+	return filter->band;
 }
 
 static double highpass(struct filter *filter, double in, double cut, double resonance)
@@ -94,6 +106,27 @@ static double hz(double semitones_from_c0)
 	return C0_HZ * pow(2.0, semitones_from_c0 / 12.0);
 }
 
+// the minor pentatonic, five notes that never clash, whatever order they
+// land in. a degree past five goes up an octave
+static const int PENTATONIC[5] = { 0, 3, 5, 7, 10 };
+
+static double degree_hz(int octave, int degree)
+{
+	if (degree < 0)
+		degree = 0;
+	return hz(12.0 * (octave + degree / 5) + PENTATONIC[degree % 5]);
+}
+
+// ---------------------------------------------------------------- the state
+struct voice {
+	enum hit kind;
+	double start;      // on the mixer clock
+	int note;
+	int busy;
+	double ph[3];      // up to three oscillators
+	struct filter a, b;
+};
+
 // the chords of the zones, three notes as semitones from c, and the bass
 // root under them. c minor, a flat major, f minor, then g minor for the
 // tension of the core
@@ -113,6 +146,7 @@ static struct mixer {
 	double layer[LAYER_COUNT];
 	double target[LAYER_COUNT];
 	struct chord chord;
+	struct voice voices[VOICES];
 	// the oscillators of the music and their filters
 	double ph_bass, ph_bass2, ph_pad[9], ph_kick;
 	struct filter f_bass, f_pad, f_hat, f_hat_open, f_echo_l, f_echo_r;
@@ -177,6 +211,8 @@ void sound_restart(double run_time)
 	pthread_mutex_lock(&snd.lock);
 	double bar = floor(mixer_now() / BAR) * BAR;
 	snd.origin = bar - run_time;
+	for (int i = 0; i < VOICES; i++)
+		snd.voices[i].busy = 0;
 	pthread_mutex_unlock(&snd.lock);
 }
 
@@ -189,6 +225,89 @@ double sound_beat_phase(double t)
 {
 	double beats = t / BEAT;
 	return beats - floor(beats);
+}
+
+void sound_hit(enum hit which, int note, double when)
+{
+	pthread_mutex_lock(&snd.lock);
+	// the oldest voice gives way when they are all busy, so that a chain
+	// of eight never falls silent
+	int slot = -1;
+	double oldest = 1e30;
+	for (int i = 0; i < VOICES; i++) {
+		if (!snd.voices[i].busy) {
+			slot = i;
+			break;
+		}
+		if (snd.voices[i].start < oldest) {
+			oldest = snd.voices[i].start;
+			slot = i;
+		}
+	}
+	struct voice *voice = &snd.voices[slot];
+	memset(voice, 0, sizeof *voice);
+	voice->kind = which;
+	voice->start = when + snd.origin;
+	voice->note = note;
+	voice->busy = 1;
+	pthread_mutex_unlock(&snd.lock);
+}
+
+// ---------------------------------------------------------------- the hits
+// each one is a small instrument with its own filters, so that eight at
+// once do not fight over one state. t is the age of the hit in seconds
+static double play_hit(struct voice *voice, double t, double *echo_send)
+{
+	switch (voice->kind) {
+	case HIT_LOCK: {
+		// a ping, a sine at the degree with a tick of noise on the front
+		double freq = degree_hz(OCTAVE_HIT + 1, voice->note);
+		voice->ph[0] += freq / SOUND_RATE;
+		double env = envelope(t, 0.002, 0.11);
+		double tick = envelope(t, 0.0005, 0.012);
+		double out = sin(2 * M_PI * voice->ph[0]) * env * 0.34;
+		*echo_send += out * 0.5;
+		return out + noise() * tick * 0.12;
+	}
+	case HIT_SHOT: {
+		// a saw that falls an octave in a tenth of a second, through a band
+		// that follows it. the note is where it lands
+		double freq = degree_hz(OCTAVE_HIT, voice->note);
+		double sweep = 1.0 + 1.0 * envelope(t, 0.0, 0.10);
+		voice->ph[0] += freq * sweep / SOUND_RATE;
+		double env = envelope(t, 0.003, 0.18);
+		double out = bandpass(&voice->a, saw(voice->ph[0]), freq * sweep * 2.0, 0.5) * env;
+		*echo_send += out * 0.5;
+		return out * 0.5;
+	}
+	case HIT_KILL: {
+		// the impact, a burst of noise and a bell at the degree, with a
+		// thump under it. a chain of eight is a rising line of bells
+		double freq = degree_hz(OCTAVE_HIT, voice->note);
+		voice->ph[0] += freq / SOUND_RATE;
+		voice->ph[1] += freq * 2.01 / SOUND_RATE;
+		double burst = envelope(t, 0.0005, 0.04);
+		double bell = envelope(t, 0.002, 0.45);
+		double thump = envelope(t, 0.001, 0.14);
+		double out = bandpass(&voice->a, noise(), 3000.0, 0.6) * burst * 0.7
+			+ (sin(2 * M_PI * voice->ph[0]) + 0.4 * sin(2 * M_PI * voice->ph[1])) * bell * 0.3
+			+ sin(2 * M_PI * (60.0 + 50.0 * thump) * t) * thump * 0.5;
+		*echo_send += out * 0.6;
+		return out;
+	}
+	default:
+		return 0.0;
+	}
+}
+
+static double hit_length(enum hit kind)
+{
+	switch (kind) {
+	case HIT_LOCK: return 0.15;
+	case HIT_SHOT: return 0.22;
+	case HIT_KILL: return 0.5;
+	default:       return 0.5;
+	}
 }
 
 // ---------------------------------------------------------------- the music
@@ -290,6 +409,19 @@ static void fill(short *buffer, int frames)
 		double t = snd.clock + n / (double)SOUND_RATE;
 		double send = 0.0;
 		double mix = music(t);
+		for (int i = 0; i < VOICES; i++) {
+			struct voice *voice = &snd.voices[i];
+			if (!voice->busy)
+				continue;
+			double age = t - voice->start;
+			if (age < 0.0)
+				continue;
+			if (age > hit_length(voice->kind)) {
+				voice->busy = 0;
+				continue;
+			}
+			mix += play_hit(voice, age, &send);
+		}
 		// one delay line, read at two taps, one per ear
 		int at = snd.echo_at;
 		double back_l = snd.echo[(at - tap_left + ECHO_MAX) % ECHO_MAX];
