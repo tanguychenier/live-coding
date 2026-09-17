@@ -20,6 +20,7 @@
 #include "player.h"
 #include "pool.h"
 #include "rail.h"
+#include "scores.h"
 #include "screen.h"
 #include "sound.h"
 #include "thing.h"
@@ -85,6 +86,13 @@
 #define SIGNATURE_SIZE   2.0
 #define SIGNATURE_AFTER  1.0
 #define SIGNATURE_DRAW   1.2
+// the table of the best runs on the title, at the left, where it starts,
+// its lines, and where the pilot floats meanwhile, to the right of it
+#define TABLE_X          22.0
+#define TABLE_Y          196.0
+#define TABLE_STEP       13.0
+#define TABLE_HEAD_GAP   2.0
+#define TABLE_SIZE       1.8
 #define TITLE_PILOT_X    0.72
 // the launch. from the press to the drop there are between one and two
 // bars, so that the drop lands on a bar. the eye starts ahead of the pilot
@@ -99,7 +107,6 @@
 #define LAUNCH_SIGNAL_REACH 8.0
 // where the numbers sit
 #define HUD_MARGIN       14.0
-#define HUD_TEXT_MAX     64       // a line of the numbers, at most
 #define HUD_SCORE_SIZE   4.0
 #define HUD_ZONE_SIZE    2.5
 #define HUD_CHAIN_SIZE   4.0
@@ -123,7 +130,7 @@
 // the end wash, how white it goes before the screen comes
 #define WON_WASH         2.0
 
-enum state { STATE_TITLE, STATE_LAUNCH, STATE_PLAY, STATE_DEAD, STATE_WON };
+enum state { STATE_TITLE, STATE_LAUNCH, STATE_PLAY, STATE_DEAD, STATE_WON, STATE_NAME };
 
 struct game {
 	struct rail rail;
@@ -146,6 +153,8 @@ struct game {
 	double launch_until;     // when the drop comes, on the run clock
 	double signal_at;        // when the signal left, for the wave in the tunnel
 	int titled;              // the title has been seen, the lesson can follow
+	char name[NAME_MAX + 1]; // being typed for the table
+	int final_zone;
 };
 
 static double ease(double part)
@@ -254,7 +263,7 @@ static void set_layers(const struct game *game, double now)
 	if (game->boss.dead || game->state == STATE_WON)
 		for (int i = 0; i < LAYER_COUNT; i++)
 			level[i] = MIX_WON[i];
-	if (game->state == STATE_DEAD)
+	if (game->state == STATE_DEAD || (game->state == STATE_NAME && !game->boss.dead))
 		for (int i = 0; i < LAYER_COUNT; i++)
 			level[i] = MIX_DEAD[i];
 	// the title waits on the pad alone, the launch holds its breath
@@ -306,10 +315,20 @@ static void place_camera(struct game *game, struct sight *sight, double elapsed,
 	sight->bend = bend;
 }
 
-// the run is over, won or given up, back to the title
-static void end_run(struct game *game)
+// the run is over, won or given up. if it ranks, the name is asked for,
+// and the table keeps it. otherwise straight back to the title
+static void end_run(struct game *game, double now)
 {
-	begin_title(game);
+	game->final_score = game->player.score;
+	game->final_chain = game->player.best_chain;
+	game->final_zone = game->boss.dead ? ZONES : game->zone;
+	if (scores_rank(game->final_score) < 0) {
+		begin_title(game);
+		return;
+	}
+	game->state = STATE_NAME;
+	game->state_at = now;
+	game->name[0] = 0;
 }
 
 // the death screen keeps the world as it was, only the sparks and the
@@ -376,6 +395,20 @@ static void step_play(struct game *game, const struct keys *keys, double elapsed
 	}
 }
 
+// a letter typed or erased on the name screen, and enter to keep it
+static void type_name(struct game *game, struct keys *keys)
+{
+	size_t length = strlen(game->name);
+	if (keys->typed && length < NAME_MAX) {
+		game->name[length] = keys->typed;
+		game->name[length + 1] = 0;
+	}
+	if (keys->erase && length > 0)
+		game->name[length - 1] = 0;
+	keys->typed = 0;
+	keys->erase = 0;
+}
+
 // the title. the eye stands at the start of the rail and rolls a little
 static void step_title(struct game *game, double elapsed, double now)
 {
@@ -435,17 +468,38 @@ static void write_centered(double y, const char *text, double size, struct light
 	font_write((view_width - font_width(text, size)) / 2.0, y, text, size, colour);
 }
 
+// the table of the best runs, on the title, one line each, the place, the
+// name, the points, the zone reached and the best chain
+static void draw_table(double gain)
+{
+	if (scores_count() == 0)
+		return;
+	double x = px(TABLE_X), y = px(TABLE_Y);
+	font_write(x, y, "BEST SIGNALS", px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD_DIM, gain));
+	y += px(TABLE_STEP) + px(TABLE_HEAD_GAP);
+	for (int i = 0; i < scores_count(); i++) {
+		const struct score *score = scores_at(i);
+		char line[SCORES_LINE];
+		snprintf(line, sizeof line, "%2d %-8s %08ld %-9s X%d", i + 1, score->name,
+			 score->points, score->zone >= ZONES ? "CLEAR" : palette_of(score->zone)->name,
+			 score->chain);
+		font_write(x, y, line, px(TABLE_SIZE), light_scale(i == 0 ? LIGHT_CHAIN : LIGHT_HUD, gain));
+		y += px(TABLE_STEP);
+	}
+}
+
 // the numbers along the top, the health along the bottom. drawn twice, once
 // in the light so that they glow, once sharp so that they read
 static void draw_hud(const struct game *game, double now, double gain)
 {
 	const struct player *player = &game->player;
-	char text[HUD_TEXT_MAX];
+	char text[SCORES_LINE];
 	int blink = fmod(now * HUD_BLINK, 1.0) < HUD_BLINK_ON;
 	if (game->state == STATE_TITLE) {
 		if (blink)
 			write_centered(view_height * TITLE_PRESS_Y, "PRESS ENTER TO START",
 				       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD, gain));
+		draw_table(gain);
 		double drawn = (now - game->state_at - SIGNATURE_AFTER) / SIGNATURE_DRAW;
 		if (drawn > 0.0)
 			font_write_drawn(view_width - px(HUD_MARGIN) - font_width(SIGNATURE, px(SIGNATURE_SIZE)),
@@ -455,6 +509,21 @@ static void draw_hud(const struct game *game, double now, double gain)
 	}
 	if (game->state == STATE_LAUNCH)
 		return;
+	if (game->state == STATE_NAME) {
+		double y = view_height * WON_Y;
+		write_centered(y, game->boss.dead ? "SIGNAL RESTORED" : "SIGNAL LOST", px(BIG_SIZE),
+			       light_scale(game->boss.dead ? LIGHT_ENDING : LIGHT_HURT, gain));
+		snprintf(text, sizeof text, "SCORE %08ld", game->final_score);
+		write_centered(y + px(LINE_GAP + 16), text, px(MID_SIZE), light_scale(LIGHT_HUD, gain));
+		write_centered(y + px(2 * LINE_GAP + 16), "YOUR NAME", px(HUD_ZONE_SIZE),
+			       light_scale(LIGHT_HUD_DIM, gain));
+		// the name so far, and a mark where the next letter goes
+		snprintf(text, sizeof text, "%s%s", game->name, blink ? "-" : " ");
+		write_centered(y + px(3 * LINE_GAP + 10), text, px(MID_SIZE), light_scale(LIGHT_CHAIN, gain));
+		write_centered(y + px(4 * LINE_GAP + 16), "TYPE IT AND PRESS ENTER", px(HUD_ZONE_SIZE),
+			       light_scale(LIGHT_HUD_DIM, gain));
+		return;
+	}
 	if (game->state != STATE_WON) {
 		snprintf(text, sizeof text, "%08ld", player->score);
 		font_write(px(HUD_MARGIN), px(HUD_MARGIN - 2), text, px(HUD_SCORE_SIZE),
@@ -532,7 +601,7 @@ static void draw_hud(const struct game *game, double now, double gain)
 static void draw_frame(struct game *game, double now)
 {
 	// the end is drawn in the calm colours of the start
-	int calm = game->state == STATE_WON;
+	int calm = game->state == STATE_WON || (game->state == STATE_NAME && game->boss.dead);
 	const struct palette *pal = palette_of(calm ? ZONE_UPLINK : game->zone);
 	draw_clear(pal->sky_top, pal->sky_bottom);
 	draw_fog(pal->fog);
@@ -585,6 +654,7 @@ int main(void)
 	struct game *game = &the_game;
 	level_build_rail(&game->rail);
 	pool_open();
+	scores_load();
 	sound_open();
 	// a run can start anywhere in the level, for a look at a zone
 	const char *start = getenv("TEC_START");
@@ -643,15 +713,26 @@ int main(void)
 				begin_run(game, level_zone_time(game->zone), game->level.zone_score);
 			else if (keys.fire && game->fire_let_go && now - game->state_at > DEATH_WAIT) {
 				keys.fire = 0;
-				end_run(game);
+				end_run(game, now);
 			}
 			break;
 		case STATE_WON:
 			step_frozen(game, elapsed, now);
 			if (enter || now - game->state_at > WON_IDLE)
-				end_run(game);
+				end_run(game, now);
+			break;
+		case STATE_NAME:
+			step_frozen(game, elapsed, now);
+			type_name(game, &keys);
+			if (enter) {
+				scores_add(game->name, game->final_score, game->final_zone, game->final_chain);
+				scores_save();
+				begin_title(game);
+			}
 			break;
 		}
+		keys.typed = 0;
+		keys.erase = 0;
 		set_layers(game, now);
 		draw_frame(game, now);
 		screen_present(&screen);
