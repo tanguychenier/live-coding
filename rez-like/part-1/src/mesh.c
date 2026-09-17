@@ -63,11 +63,57 @@ static void cube(struct mesh *mesh)
 	face(mesh, 0, 1, 5); face(mesh, 0, 5, 4);
 }
 
+// the pilot, flying prone, head forward, arms out like a glider, legs
+// trailing. seen from behind and a little above, which is where the eye is.
+// the head is a small solid of its own, the rest is the silhouette
+static void hero(struct mesh *mesh)
+{
+	point(mesh, 0.00, 0.56, 1.05);    // 0 head top
+	point(mesh, 0.18, 0.36, 1.05);    // 1 head right
+	point(mesh, 0.00, 0.18, 1.05);    // 2 head bottom
+	point(mesh, -0.18, 0.36, 1.05);   // 3 head left
+	point(mesh, 0.00, 0.36, 1.26);    // 4 head front
+	point(mesh, 0.00, 0.36, 0.88);    // 5 head back
+	point(mesh, 0.00, 0.26, 0.82);    // 6 neck
+	point(mesh, 0.36, 0.30, 0.72);    // 7 shoulder right
+	point(mesh, -0.36, 0.30, 0.72);   // 8 shoulder left
+	point(mesh, 0.30, 0.02, 0.70);    // 9 chest right
+	point(mesh, -0.30, 0.02, 0.70);   // 10 chest left
+	point(mesh, 0.20, 0.18, 0.05);    // 11 waist right
+	point(mesh, -0.20, 0.18, 0.05);   // 12 waist left
+	point(mesh, 0.22, 0.00, -0.05);   // 13 hip right
+	point(mesh, -0.22, 0.00, -0.05);  // 14 hip left
+	point(mesh, 0.90, 0.28, 0.60);    // 15 elbow right
+	point(mesh, -0.90, 0.28, 0.60);   // 16 elbow left
+	point(mesh, 1.40, 0.34, 0.85);    // 17 hand right
+	point(mesh, -1.40, 0.34, 0.85);   // 18 hand left
+	point(mesh, 0.16, 0.06, -0.55);   // 19 knee right
+	point(mesh, -0.16, 0.06, -0.55);  // 20 knee left
+	point(mesh, 0.12, 0.12, -1.00);   // 21 foot right
+	point(mesh, -0.12, 0.12, -1.00);  // 22 foot left
+	// the head
+	edge(mesh, 0, 1); edge(mesh, 1, 2); edge(mesh, 2, 3); edge(mesh, 3, 0);
+	edge(mesh, 4, 0); edge(mesh, 4, 1); edge(mesh, 4, 2); edge(mesh, 4, 3);
+	edge(mesh, 5, 0); edge(mesh, 5, 1); edge(mesh, 5, 2); edge(mesh, 5, 3);
+	// the body
+	edge(mesh, 5, 6); edge(mesh, 6, 7); edge(mesh, 6, 8);
+	edge(mesh, 7, 9); edge(mesh, 8, 10); edge(mesh, 9, 10);
+	edge(mesh, 7, 11); edge(mesh, 8, 12); edge(mesh, 9, 11); edge(mesh, 10, 12); edge(mesh, 11, 12);
+	edge(mesh, 11, 13); edge(mesh, 12, 14); edge(mesh, 13, 14);
+	face(mesh, 7, 8, 12); face(mesh, 7, 12, 11); face(mesh, 11, 12, 14); face(mesh, 11, 14, 13);
+	face(mesh, 7, 9, 11); face(mesh, 8, 12, 10);
+	// the arms and the legs
+	edge(mesh, 7, 15); edge(mesh, 15, 17); edge(mesh, 8, 16); edge(mesh, 16, 18);
+	edge(mesh, 13, 19); edge(mesh, 19, 21); edge(mesh, 14, 20); edge(mesh, 20, 22); edge(mesh, 21, 22);
+	face(mesh, 13, 14, 20); face(mesh, 13, 20, 19);
+}
+
 static void build(void)
 {
 	memset(shapes, 0, sizeof shapes);
 	octahedron(&shapes[SHAPE_OCTA]);
 	cube(&shapes[SHAPE_CUBE]);
+	hero(&shapes[SHAPE_HERO]);
 	built = 1;
 }
 

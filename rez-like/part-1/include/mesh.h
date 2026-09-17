@@ -18,7 +18,13 @@ struct mesh {
 };
 
 // the shapes of the game, all built from numbers, none loaded
-enum shape { SHAPE_OCTA, SHAPE_CUBE, SHAPE_COUNT };
+enum shape { SHAPE_OCTA, SHAPE_CUBE, SHAPE_HERO, SHAPE_COUNT };
+
+// the points of the pilot that move, by name, so that the arms can be
+// thrown forward and the legs kicked without counting
+enum hero_point { HERO_HAND_R = 17, HERO_HAND_L = 18, HERO_ELBOW_R = 15,
+		  HERO_ELBOW_L = 16, HERO_FOOT_R = 21, HERO_FOOT_L = 22,
+		  HERO_KNEE_R = 19, HERO_KNEE_L = 20, HERO_HEAD_FRONT = 4 };
 
 const struct mesh *mesh_of(enum shape shape);
 

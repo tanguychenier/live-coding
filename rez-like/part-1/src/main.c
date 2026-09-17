@@ -10,8 +10,10 @@
 #include <unistd.h>
 
 #include "draw.h"
+#include "hero.h"
 #include "level.h"
 #include "palette.h"
+#include "particle.h"
 #include "rail.h"
 #include "screen.h"
 #include "sound.h"
@@ -37,6 +39,7 @@
 
 struct game {
 	struct rail rail;
+	struct hero hero;
 	struct camera camera;
 	int zone;
 	double t_eye;
@@ -55,6 +58,8 @@ static void begin_run(struct game *game, double at)
 {
 	sound_restart(at);
 	double now = sound_now();
+	hero_reset(&game->hero);
+	particles_clear();
 	game->zone = level_zone(now);
 	game->t_eye = level_t_eye(&game->rail, now);
 	game->roll = 0.0;
@@ -101,6 +106,10 @@ static void step_play(struct game *game, double elapsed, double now)
 {
 	game->t_eye = level_t_eye(&game->rail, now);
 	place_camera(game, elapsed);
+	// the pilot flies straight ahead for now, the sight comes next
+	hero_update(&game->hero, &game->camera, view_width / 2.0, view_height / 2.0, 0,
+		    elapsed, now);
+	particles_update(elapsed);
 }
 
 static void draw_frame(struct game *game, double now)
@@ -110,6 +119,8 @@ static void draw_frame(struct game *game, double now)
 	draw_fog(pal->fog);
 	draw_pulse(exp(-sound_beat_phase(now) * BEAT_DECAY));
 	tunnel_draw(&game->camera, &game->rail, game->t_eye, now, pal);
+	particles_draw(&game->camera);
+	hero_draw(&game->hero, &game->camera, now);
 	draw_finish();
 }
 
