@@ -45,7 +45,7 @@
     <div class="hint" id="hint">loading</div>
   </div>
   <div id="bar">
-    <span class="keys">arrows and mouse · ctrl attack · space open · 1 2 weapon · m map · n sound · esc menu</span>
+    <span class="keys">arrows and mouse · ctrl attack · space open · 1 2 weapon · m map · n sound · esc menu · esc leaves full screen, click the game to go back</span>
     <a href="https://www.youtube.com/playlist?list=PLBPRrs12VQXc">watch it being written</a>
     <a href="https://github.com/tanguychenier/live-coding/tree/main/wolfenstein-like">source</a>
     <a href="../">all the games</a>
@@ -67,6 +67,12 @@
     splash.style.transition = 'opacity 0.6s';
     splash.style.opacity = '0';
     setTimeout(() => { splash.remove(); document.getElementById('canvas').focus(); }, 650);
+    // the game opens full screen, from the click or the key that starts it,
+    // the only moment a browser allows it. escape gives the page back, the
+    // game keeps running, and a click on the canvas goes full screen again
+    const plein = () => { const p = document.documentElement.requestFullscreen; if (p) p.call(document.documentElement).catch(() => {}); };
+    plein();
+    document.getElementById('canvas').addEventListener('click', () => { if (!document.fullscreenElement) plein(); });
     Module.callMain([]);
   }
   splash.addEventListener('click', start);
