@@ -14,7 +14,7 @@
      as wide as the window allows, or as tall as the window minus the bar.
      !important, because the SDL runtime writes its own size on the element */
   canvas { display: block; outline: none;
-           width: min(100vw, calc((100vh - 34px) * (1280 / 800))) !important;
+           width: min(100vw, calc((100vh - 34px) * var(--ratio, calc(1280 / 800)))) !important;
            height: auto !important; max-width: 100vw; }
   #loadingCanvas { display: none; }
   #splash { position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -79,6 +79,12 @@
     document.getElementById('canvas').addEventListener('click', () => { if (!document.fullscreenElement) plein(); });
     Module.callMain([]);
   }
+  // the picture takes the shape of the screen : the page follows the size the
+  // game gives its canvas, so that the stretch keeps the proportions
+  const suivre = () => { const c = document.getElementById('canvas');
+    if (c.width && c.height) c.style.setProperty('--ratio', (c.width / c.height).toString()); };
+  new MutationObserver(suivre).observe(document.getElementById('canvas'), { attributes: true, attributeFilter: ['width', 'height'] });
+  suivre();
   splash.addEventListener('click', start);
   window.addEventListener('keydown', e => {
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
@@ -87,12 +93,12 @@
   var Module = {
     canvas: document.getElementById('canvas'),
     noInitialRun: true,
-    locateFile: function (path) { return path + '?v=3d8e708fba'; },
+    locateFile: function (path) { return path + '?v=18591354a2'; },
     onRuntimeInitialized: function () { ready = true; hint.textContent = 'click, or press enter'; },
     print: function (t) { console.log(t); },
     printErr: function (t) { console.error(t); },
   };
 </script>
-<script src="axon.js?v=3d8e708fba"></script>
+<script src="axon.js?v=18591354a2"></script>
 </body>
 </html>
