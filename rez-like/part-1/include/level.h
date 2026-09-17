@@ -18,6 +18,13 @@
 // the first wave waits this long after the zone begins, in beats
 #define FIRST_WAVE_BEATS    4.0
 
+struct level {
+	int zone;
+	int wave;
+	double next_wave;        // on the music clock
+	double zone_started;
+};
+
 void level_build_rail(struct rail *rail);
 // when a zone begins, in seconds on the music clock
 double level_zone_time(int zone);
@@ -26,5 +33,9 @@ double level_speed(const struct rail *rail, double t);
 int level_zone(double now);
 // where the eye is on the rail at a moment
 double level_t_eye(const struct rail *rail, double now);
+
+void level_reset(struct level *level, double now);
+// spawns what the zone wants, when it wants it
+void level_update(struct level *level, const struct rail *rail, double t_eye, double now);
 
 #endif

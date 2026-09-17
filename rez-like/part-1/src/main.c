@@ -18,6 +18,7 @@
 #include "rail.h"
 #include "screen.h"
 #include "sound.h"
+#include "thing.h"
 #include "tunnel.h"
 
 #define GAME_NAME        "AXON"
@@ -42,6 +43,7 @@ struct game {
 	struct rail rail;
 	struct player player;
 	struct hero hero;
+	struct level level;
 	struct camera camera;
 	int zone;
 	double t_eye;
@@ -109,6 +111,8 @@ static void step_play(struct game *game, const struct keys *keys, double elapsed
 {
 	game->t_eye = level_t_eye(&game->rail, now);
 	place_camera(game, elapsed);
+	level_update(&game->level, &game->rail, game->t_eye, now);
+	things_update(&game->rail, game->t_eye, elapsed, now);
 	player_update(&game->player, keys, elapsed);
 	hero_update(&game->hero, &game->camera, game->player.cursor_x, game->player.cursor_y, 0,
 		    elapsed, now);
@@ -142,6 +146,8 @@ int main(void)
 	begin_run(game, start ? floor(atof(start) / BAR) * BAR : 0.0);
 	struct keys keys = { 0 };
 	double last = now_in_seconds();
+	const char *trace = getenv("TEC_TRACE");
+	double traced_at = 0.0;
 
 	while (!keys.quit) {
 		double moment = now_in_seconds();
@@ -159,6 +165,10 @@ int main(void)
 		set_layers(game, now);
 		draw_frame(game, now);
 		screen_present(&screen);
+		if (trace && moment - traced_at > 0.5) {
+			traced_at = moment;
+			fprintf(stderr, "t %.1f eye %.2f things %d\n", now, game->t_eye, things_count());
+		}
 		double spent = now_in_seconds() - moment;
 		if (spent < FRAME_SECONDS)
 			usleep((useconds_t)((FRAME_SECONDS - spent) * 1e6));

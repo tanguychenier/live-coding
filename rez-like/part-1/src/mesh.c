@@ -63,6 +63,21 @@ static void cube(struct mesh *mesh)
 	face(mesh, 0, 1, 5); face(mesh, 0, 5, 4);
 }
 
+// a long crystal, sharp at both ends, with a square waist
+static void diamond(struct mesh *mesh)
+{
+	point(mesh, 0, 0, 2.2); point(mesh, 0, 0, -2.2);
+	point(mesh, 1, 0, 0); point(mesh, 0, 1, 0); point(mesh, -1, 0, 0); point(mesh, 0, -1, 0);
+	for (int i = 2; i < 6; i++) {
+		int next = i == 5 ? 2 : i + 1;
+		edge(mesh, 0, i);
+		edge(mesh, 1, i);
+		edge(mesh, i, next);
+		face(mesh, 0, i, next);
+		face(mesh, 1, i, next);
+	}
+}
+
 // the pilot, flying prone, head forward, arms out like a glider, legs
 // trailing. seen from behind and a little above, which is where the eye is.
 // the head is a small solid of its own, the rest is the silhouette
@@ -113,6 +128,7 @@ static void build(void)
 	memset(shapes, 0, sizeof shapes);
 	octahedron(&shapes[SHAPE_OCTA]);
 	cube(&shapes[SHAPE_CUBE]);
+	diamond(&shapes[SHAPE_DIAMOND]);
 	hero(&shapes[SHAPE_HERO]);
 	built = 1;
 }
