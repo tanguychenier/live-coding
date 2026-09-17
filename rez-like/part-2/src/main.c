@@ -67,6 +67,36 @@
 #define UPLINK_HAT_BAR   8.0
 #define UPLINK_HAT_HALF  0.4
 #define UPLINK_HAT_FULL_BAR 32.0
+// the title screen. the name of the game stands in the world ahead of the
+// eye, this far and this high, this big, and draws itself in this long.
+// the eye rolls a little, slowly, so that the tunnel is seen to live
+#define TITLE_TEXT       "AXON"
+#define TITLE_DEPTH      7.0
+#define TITLE_UP         1.1
+#define TITLE_SIZE       0.3
+#define TITLE_DRAW       2.2
+#define TITLE_PULSE      0.4
+#define TITLE_ROLL       0.05
+#define TITLE_ROLL_RATE  0.25
+#define TITLE_PRESS_Y    0.47     // the press enter line, in the dark of the tunnel
+// the author's name, at the bottom right of the title, writes itself in
+// this long, starting this long after the title appears, then stays still
+#define SIGNATURE        "TANGUY CH\xc3\x89NIER"
+#define SIGNATURE_SIZE   2.0
+#define SIGNATURE_AFTER  1.0
+#define SIGNATURE_DRAW   1.2
+#define TITLE_PILOT_X    0.72
+// the launch. from the press to the drop there are between one and two
+// bars, so that the drop lands on a bar. the eye starts ahead of the pilot
+// and to his right, this far and this high, and sweeps round behind him,
+// wide at first. the signal runs down the tunnel this fast, this far
+#define LAUNCH_BARS      2
+#define LAUNCH_ANGLE     1.2
+#define LAUNCH_DISTANCE  4.6
+#define LAUNCH_HEIGHT    1.3
+#define LAUNCH_WIDE      0.7
+#define LAUNCH_SIGNAL_SPEED 2.5
+#define LAUNCH_SIGNAL_REACH 8.0
 // where the numbers sit
 #define HUD_MARGIN       14.0
 #define HUD_TEXT_MAX     64       // a line of the numbers, at most
@@ -93,7 +123,7 @@
 // the end wash, how white it goes before the screen comes
 #define WON_WASH         2.0
 
-enum state { STATE_PLAY, STATE_DEAD, STATE_WON };
+enum state { STATE_TITLE, STATE_LAUNCH, STATE_PLAY, STATE_DEAD, STATE_WON };
 
 struct game {
 	struct rail rail;
@@ -113,7 +143,16 @@ struct game {
 	int fire_let_go;         // on the death screen, fire has been let go since the death
 	long final_score;
 	int final_chain;
+	double launch_until;     // when the drop comes, on the run clock
+	double signal_at;        // when the signal left, for the wave in the tunnel
+	int titled;              // the title has been seen, the lesson can follow
 };
+
+static double ease(double part)
+{
+	part = part < 0.0 ? 0.0 : part > 1.0 ? 1.0 : part;
+	return part * part * (3.0 - 2.0 * part);
+}
 
 static double now_in_seconds(void)
 {
@@ -144,6 +183,48 @@ static void begin_run(struct game *game, double at, long score)
 	game->flash_at = -HURT_WASH;
 	sound_zone(game->zone);
 	demo_reset();
+	game->signal_at = -LAUNCH_SIGNAL_REACH;
+}
+
+// the title, the eye at the start of the rail and the pilot afloat in front
+// of it, the name of the game drawing itself ahead
+static void begin_title(struct game *game)
+{
+	begin_run(game, 0.0, 0);
+	game->state = STATE_TITLE;
+	game->state_at = sound_now();
+}
+
+// where the title stands in the world, its top left corner and its axes
+static void title_plane(const struct game *game, struct vec *origin, struct vec *right,
+			struct vec *up)
+{
+	const struct camera *cam = &game->camera;
+	double width = font_width(TITLE_TEXT, TITLE_SIZE);
+	*right = cam->right;
+	*up = cam->up;
+	*origin = add(cam->eye, add(scale(cam->forward, TITLE_DEPTH),
+		sub(scale(cam->up, TITLE_UP + GLYPH_H * TITLE_SIZE / 2.0),
+		    scale(cam->right, width / 2.0))));
+}
+
+// start is pressed. the title bursts, the pilot is held where he floats,
+// the eye lets go of him and the riser climbs to the drop
+static void begin_launch(struct game *game, double now)
+{
+	struct vec origin, right, up;
+	title_plane(game, &origin, &right, &up);
+	font_burst_3d(origin, right, up, TITLE_TEXT, TITLE_SIZE, LIGHT_HUD);
+	struct vec forward, rail_right, rail_up;
+	rail_frame(&game->rail, 0.0, &forward, &rail_right, &rail_up);
+	hero_hold(&game->hero, game->hero.at, forward, rail_right, rail_up);
+	game->state = STATE_LAUNCH;
+	game->state_at = now;
+	game->launch_until = (floor(now / BAR) + LAUNCH_BARS) * BAR;
+	game->signal_at = now;
+	sound_hit(HIT_KILL, LOCKS_MAX / 2, sound_next_step(now));
+	sound_hit(HIT_RISE, 0, game->launch_until - RISE_BARS * BAR);
+	game->titled = 1;
 }
 
 // the levels of the layers, kick, hat, bass, pad. the tunnel builds the
@@ -157,6 +238,7 @@ static const double MIX[ZONES][LAYER_COUNT] = {
 };
 static const double MIX_WON[LAYER_COUNT] = { 0.0, 0.0, 0.0, 1.0, 0.3, 0.0 };
 static const double MIX_DEAD[LAYER_COUNT] = { 0.0, 0.0, 0.0, 0.5, 0.0, 0.0 };
+static const double MIX_TITLE[LAYER_COUNT] = { 0.0, 0.0, 0.0, 0.8, 0.25, 0.0 };
 
 static void set_layers(const struct game *game, double now)
 {
@@ -175,6 +257,10 @@ static void set_layers(const struct game *game, double now)
 	if (game->state == STATE_DEAD)
 		for (int i = 0; i < LAYER_COUNT; i++)
 			level[i] = MIX_DEAD[i];
+	// the title waits on the pad alone, the launch holds its breath
+	if (game->state == STATE_TITLE || game->state == STATE_LAUNCH)
+		for (int i = 0; i < LAYER_COUNT; i++)
+			level[i] = game->state == STATE_TITLE ? MIX_TITLE[i] : 0.0;
 	for (int i = 0; i < LAYER_COUNT; i++)
 		sound_layer((enum layer)i, level[i]);
 }
@@ -220,10 +306,10 @@ static void place_camera(struct game *game, struct sight *sight, double elapsed,
 	sight->bend = bend;
 }
 
-// the run is over, won or given up, back to the start
+// the run is over, won or given up, back to the title
 static void end_run(struct game *game)
 {
-	begin_run(game, 0.0, 0);
+	begin_title(game);
 }
 
 // the death screen keeps the world as it was, only the sparks and the
@@ -290,6 +376,54 @@ static void step_play(struct game *game, const struct keys *keys, double elapsed
 	}
 }
 
+// the title. the eye stands at the start of the rail and rolls a little
+static void step_title(struct game *game, double elapsed, double now)
+{
+	struct vec forward, right, up;
+	rail_frame(&game->rail, 0.0, &forward, &right, &up);
+	struct vec eye = sub(rail_at(&game->rail, 0.0), scale(up, EYE_DROP));
+	struct vec at = rail_at(&game->rail, LOOK_AHEAD);
+	double roll = TITLE_ROLL * sin(now * TITLE_ROLL_RATE);
+	camera_look(&game->camera, eye, at, vec(0, 1, 0), roll, FOCAL);
+	// the pilot floats to the right, the table of the best runs is on the left
+	hero_update(&game->hero, &game->camera, view_width * TITLE_PILOT_X, view_height / 2.0, 0, 0,
+		    elapsed, now);
+	particles_update(elapsed);
+}
+
+// the launch. the pilot floats where the title left him, the eye sweeps
+// from ahead of him round to behind him, wide at first, and settles into
+// the game's own view exactly as the drop comes
+static void step_launch(struct game *game, double elapsed, double now)
+{
+	double length = game->launch_until - game->state_at;
+	double part = ease((now - game->state_at) / length);
+	struct vec forward, right, up;
+	rail_frame(&game->rail, 0.0, &forward, &right, &up);
+	struct vec eye_run = sub(rail_at(&game->rail, 0.0), scale(up, EYE_DROP));
+	struct vec at_run = rail_at(&game->rail, LOOK_AHEAD);
+	struct vec pilot = game->hero.at;
+	// round the pilot, from his front right to straight behind
+	double angle = LAUNCH_ANGLE + (-M_PI / 2.0 - LAUNCH_ANGLE) * part;
+	double distance = LAUNCH_DISTANCE + (HERO_AHEAD - LAUNCH_DISTANCE) * part;
+	double height = LAUNCH_HEIGHT + (HERO_BELOW - LAUNCH_HEIGHT) * part;
+	struct vec around = add(scale(right, distance * cos(angle)), scale(forward, distance * sin(angle)));
+	struct vec eye = add(pilot, add(around, scale(up, height)));
+	// the last of the sweep lands exactly on the game's eye
+	eye = mix(eye, eye_run, part * part);
+	struct vec at = mix(pilot, at_run, part);
+	double focal = FOCAL * (LAUNCH_WIDE + (1.0 - LAUNCH_WIDE) * part);
+	camera_look(&game->camera, eye, at, vec(0, 1, 0), 0.0, focal);
+	hero_update(&game->hero, &game->camera, view_width / 2.0, view_height / 2.0, 0, 0,
+		    elapsed, now);
+	particles_update(elapsed);
+	if (now >= game->launch_until) {
+		double since_signal = now - game->signal_at;
+		begin_run(game, 0.0, 0);
+		game->signal_at = sound_now() - since_signal;
+	}
+}
+
 // the numbers are laid out in base pixels and scaled to the picture
 static double px(double base)
 {
@@ -308,6 +442,19 @@ static void draw_hud(const struct game *game, double now, double gain)
 	const struct player *player = &game->player;
 	char text[HUD_TEXT_MAX];
 	int blink = fmod(now * HUD_BLINK, 1.0) < HUD_BLINK_ON;
+	if (game->state == STATE_TITLE) {
+		if (blink)
+			write_centered(view_height * TITLE_PRESS_Y, "PRESS ENTER TO START",
+				       px(HUD_ZONE_SIZE), light_scale(LIGHT_HUD, gain));
+		double drawn = (now - game->state_at - SIGNATURE_AFTER) / SIGNATURE_DRAW;
+		if (drawn > 0.0)
+			font_write_drawn(view_width - px(HUD_MARGIN) - font_width(SIGNATURE, px(SIGNATURE_SIZE)),
+					 view_height - px(HUD_MARGIN + SIGNATURE_SIZE * GLYPH_H), SIGNATURE,
+					 px(SIGNATURE_SIZE), light_scale(LIGHT_HUD_DIM, gain), drawn);
+		return;
+	}
+	if (game->state == STATE_LAUNCH)
+		return;
 	if (game->state != STATE_WON) {
 		snprintf(text, sizeof text, "%08ld", player->score);
 		font_write(px(HUD_MARGIN), px(HUD_MARGIN - 2), text, px(HUD_SCORE_SIZE),
@@ -350,7 +497,7 @@ static void draw_hud(const struct game *game, double now, double gain)
 			       light_scale(LIGHT_HUD, gain * fade));
 	}
 	// the first seconds say what the hands do
-	if (game->state == STATE_PLAY && now < LESSON_TIME) {
+	if (game->state == STATE_PLAY && now < LESSON_TIME && game->titled) {
 		double fade = fmin(1.0, (LESSON_TIME - now) / LESSON_FADE);
 		write_centered(px(HUD_LESSON_Y), "ARROWS OR MOUSE MOVE THE SIGHT", px(HUD_ZONE_SIZE),
 			       light_scale(LIGHT_HUD_DIM, gain * fade));
@@ -390,11 +537,23 @@ static void draw_frame(struct game *game, double now)
 	draw_clear(pal->sky_top, pal->sky_bottom);
 	draw_fog(pal->fog);
 	draw_pulse(exp(-sound_beat_phase(now) * BEAT_DECAY));
+	// the signal, a wave of white down the tunnel from the launch
+	double front = (now - game->signal_at) * LAUNCH_SIGNAL_SPEED;
+	tunnel_signal(front < LAUNCH_SIGNAL_REACH ? front : -1.0);
 	if (game->boss.active)
 		world_arena(&game->camera, game->boss.centre, now, pal,
 			    (double)game->boss.phase / (BOSS_PHASES - 1));
 	else
 		world_draw(&game->camera, &game->rail, game->t_eye, now, game->zone, pal);
+	if (game->state == STATE_TITLE) {
+		// the name draws itself, and breathes on the beat once drawn
+		struct vec origin, right, up;
+		title_plane(game, &origin, &right, &up);
+		double drawn = (now - game->state_at) / TITLE_DRAW;
+		double pulse = drawn >= 1.0 ? TITLE_PULSE * exp(-sound_beat_phase(now) * BEAT_DECAY) : 0.0;
+		font_write_3d(&game->camera, origin, right, up, TITLE_TEXT, TITLE_SIZE,
+			      light_scale(LIGHT_HUD, 1.0 + pulse), drawn);
+	}
 	boss_draw(&game->boss, &game->camera, now, pal);
 	things_draw(&game->camera, now);
 	particles_draw(&game->camera);
@@ -434,6 +593,9 @@ int main(void)
 	struct screen screen;
 	if (!screen_open(&screen, GAME_NAME))
 		return 1;
+	// the title comes first, unless the bench asked for a place in the level
+	if (!start)
+		begin_title(game);
 	struct keys keys = { 0 };
 	double last = now_in_seconds();
 	const char *trace = getenv("TEC_TRACE");
@@ -458,6 +620,16 @@ int main(void)
 		int enter = keys.enter;
 		keys.enter = 0;
 		switch (game->state) {
+		case STATE_TITLE:
+			step_title(game, elapsed, now);
+			if (enter || keys.fire || keys.mouse_down) {
+				keys.fire = 0;
+				begin_launch(game, now);
+			}
+			break;
+		case STATE_LAUNCH:
+			step_launch(game, elapsed, now);
+			break;
 		case STATE_PLAY:
 			step_play(game, &keys, elapsed, now);
 			break;
