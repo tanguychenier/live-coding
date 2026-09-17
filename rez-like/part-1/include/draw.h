@@ -98,4 +98,7 @@ int draw_project(const struct camera *cam, struct vec point, double *x, double *
 void camera_look(struct camera *cam, struct vec eye, struct vec at,
 		 struct vec up, double roll, double focal);
 
+// the beat, zero to one, the bloom swells with it
+void draw_pulse(double gain);
+
 #endif

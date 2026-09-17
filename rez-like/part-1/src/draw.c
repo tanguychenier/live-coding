@@ -145,6 +145,11 @@ void draw_fog(double depth)
 	fog_depth = depth;
 }
 
+void draw_pulse(double gain)
+{
+	pulse = gain;
+}
+
 // the camera is built from where it is and what it looks at. the roll turns
 // it around its own line of sight, which is what a rail does in a bend
 void camera_look(struct camera *cam, struct vec eye, struct vec at,

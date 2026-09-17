@@ -19,12 +19,18 @@
 // sits below the rail by this much of it, the floor nearer than the ceiling
 #define TUNNEL_RADIUS   6.0
 #define EYE_DROP        1.2
+// the tunnel breathes on the beat, by this much of its radius
+#define BREATH          0.08
 // every this many rings, one is brighter. it gives the eye a sense of speed
 #define STRONG_EVERY    4
 // the weak rings and the long lines, as fractions of the zone's light
 #define WEAK_RING       0.45
 #define RAIL_LIT        0.5
 #define RAIL_DIM        0.22
+// a strong ring flashes white on the kick, for this much of the beat, and
+// this bright at the kick itself
+#define FLASH_PHASE     0.25
+#define FLASH_GAIN      0.6
 
 void tunnel_draw(const struct camera *cam, const struct rail *rail, double t_eye,
 		 double now, const struct palette *pal);
